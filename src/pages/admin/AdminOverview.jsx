@@ -7,9 +7,10 @@ import { affiliateProfile, orderItems, peso } from '../../utils/helpers';
 export default function AdminOverview({ data, onAddSale }) {
   const confirmed = data.orders.filter((order) => order.status === 'confirmed');
   const totalSales = confirmed.reduce((sum, order) => sum + Number(order.final_sale || 0), 0);
-  const paidCommission = data.commissions
-    .filter((item) => item.payment_status === 'paid')
-    .reduce((sum, item) => sum + Number(item.commission_amount || 0), 0);
+  const totalCommission = data.commissions.reduce(
+    (sum, item) => sum + Number(item.commission_amount || 0),
+    0,
+  );
   const productsSold = confirmed.reduce(
     (sum, order) => sum + orderItems(order).reduce((qty, item) => qty + Number(item.quantity || 0), 0),
     0,
@@ -58,7 +59,7 @@ export default function AdminOverview({ data, onAddSale }) {
       <div className="stats-grid">
         <StatCard icon={ShoppingBag} label="Confirmed athlete sales" value={peso(totalSales)} accent />
         <StatCard icon={Package} label="Products sold" value={productsSold} />
-        <StatCard icon={BadgeDollarSign} label="Direct commission paid" value={peso(paidCommission)} />
+        <StatCard icon={BadgeDollarSign} label="Commission earned" value={peso(totalCommission)} />
         <StatCard icon={Users} label="Athlete accounts" value={data.affiliates.length} />
       </div>
 

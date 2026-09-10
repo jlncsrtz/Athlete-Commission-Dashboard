@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, CircleDollarSign, Copy, Package, ShoppingBag, Wallet } from 'lucide-react';
+import { BarChart3, CircleDollarSign, Copy, Package, ShoppingBag } from 'lucide-react';
 import StatCard from '../../components/common/StatCard';
 import SalesTable from '../../components/sales/SalesTable';
 import { orderItems, peso, salesFromOrders } from '../../utils/helpers';
@@ -10,10 +10,6 @@ export default function AffiliateDashboard({ account, data }) {
   const salesTotal = confirmed.reduce((sum, sale) => sum + sale.sale, 0);
   const qty = confirmed.reduce((sum, sale) => sum + sale.qty, 0);
   const commission = confirmed.reduce((sum, sale) => sum + sale.commission, 0);
-  const paid = confirmed
-    .filter((sale) => sale.paymentStatus === 'paid')
-    .reduce((sum, sale) => sum + sale.commission, 0);
-
   const productMap = {};
   confirmed.forEach((sale) => {
     orderItems(sale.raw).forEach((item) => {
@@ -37,11 +33,10 @@ export default function AffiliateDashboard({ account, data }) {
         </div>
       </div>
 
-      <div className="stats-grid">
+      <div className="stats-grid three">
         <StatCard icon={ShoppingBag} label="Confirmed sales" value={peso(salesTotal)} detail="Lifetime attributed sales" accent />
         <StatCard icon={Package} label="Products sold" value={qty} detail="Confirmed orders" />
         <StatCard icon={CircleDollarSign} label="Commission earned" value={peso(commission)} detail="Based on product commission amounts" />
-        <StatCard icon={Wallet} label="Commission paid" value={peso(paid)} detail="Paid directly per confirmed sale" />
       </div>
 
       <div className="two-col">

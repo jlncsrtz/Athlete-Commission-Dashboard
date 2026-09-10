@@ -31,6 +31,9 @@ export default function PortalLayout({
         .join('')
         .toUpperCase();
 
+  const activeNav = nav.find(([id]) => id === page);
+  const activeLabel = activeNav?.[1] || (isAdmin ? 'Overview' : 'Dashboard');
+
   return (
     <div className="app-shell">
       <aside className={collapsed ? 'sidebar collapsed' : 'sidebar'}>
@@ -86,7 +89,7 @@ export default function PortalLayout({
 
       <main>
         <header className="topbar">
-          <div className="mobile-title">Athlete's Commission Portal</div>
+          <div className="mobile-title">{activeLabel}</div>
           <div className="topbar-right">
             <span className="system-dot" />
             <span className="system-label">Supabase connected</span>
@@ -97,6 +100,9 @@ export default function PortalLayout({
               <ShieldCheck size={15} />
               {isAdmin ? 'Admin' : 'Athlete'}
             </div>
+            <button className="icon-btn mobile-logout-btn" onClick={onLogout} title="Log out" aria-label="Log out">
+              <LogOut size={16} />
+            </button>
           </div>
         </header>
 

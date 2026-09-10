@@ -77,29 +77,18 @@ export default function Login() {
         <div className="login-message">
           <span className="eyebrow">ATHLETE'S PAYOUT SYSTEM</span>
           <h1>
-            Sales in.
+            YOUR INFLUENCE.
             <br />
-            <em>Commission out.</em>
+            <em>YOUR EARNINGS</em>
           </h1>
-          <p>Transparent athlete sales, earnings, direct payments, and commission records.</p>
-        </div>
-
-        <div className="login-metric">
-          <div>
-            <span>Athlete's visibility</span>
-            <strong>REAL</strong>
-          </div>
-          <div>
-            <span>Demo data</span>
-            <strong>OFF</strong>
-          </div>
+          <p>A dedicated commission dashboard for PEAKATHLETE Athletes.</p>
         </div>
       </div>
 
       <div className="login-right">
         <form className="auth-card login-card" onSubmit={submit}>
           <span className="eyebrow">
-            {isLogin ? 'WELCOME BACK' : isSignup ? 'NEW ATHLETE' : 'ACCOUNT RECOVERY'}
+            {isLogin ? 'WELCOME BACK ATHLETE' : isSignup ? 'NEW ATHLETE' : 'ACCOUNT RECOVERY'}
           </span>
           <h2>
             {isLogin ? 'Sign in to continue' : isSignup ? 'Create athlete account' : 'Forgot your password?'}

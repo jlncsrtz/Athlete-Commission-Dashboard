@@ -1,5 +1,5 @@
 import React from 'react';
-import { BadgeDollarSign, CheckCircle2, Eye, ReceiptText, Wallet } from 'lucide-react';
+import { BadgeDollarSign, Eye, ReceiptText } from 'lucide-react';
 import { signedImage } from '../../api';
 import PageHeader from '../../components/common/PageHeader';
 import StatCard from '../../components/common/StatCard';
@@ -9,10 +9,6 @@ import { dateLabel, peso, salesFromOrders } from '../../utils/helpers';
 export default function AffiliateCommissions({ orders }) {
   const sales = salesFromOrders(orders).filter((sale) => sale.status === 'confirmed');
   const total = sales.reduce((sum, sale) => sum + Number(sale.commission || 0), 0);
-  const paid = sales
-    .filter((sale) => sale.paymentStatus === 'paid')
-    .reduce((sum, sale) => sum + Number(sale.commission || 0), 0);
-
   async function viewReceipt(sale) {
     if (!sale.receiptPath) return;
     const url = await signedImage('payout-receipts', sale.receiptPath);
@@ -26,10 +22,8 @@ export default function AffiliateCommissions({ orders }) {
         title="Commission history"
         subtitle="See the commission for each confirmed sale and whether it was paid directly."
       />
-      <div className="stats-grid three">
+      <div className="stats-grid single">
         <StatCard icon={BadgeDollarSign} label="Commission earned" value={peso(total)} accent />
-        <StatCard icon={CheckCircle2} label="Total paid" value={peso(paid)} />
-        <StatCard icon={Wallet} label="Paid sales" value={sales.filter((sale) => sale.paymentStatus === 'paid').length} />
       </div>
       <div className="panel">
         <div className="section-title-row">
