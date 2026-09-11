@@ -3,7 +3,10 @@ import { ChevronLeft, ChevronRight, Eye, EyeOff, Mail, RefreshCw } from 'lucide-
 import { requestPasswordReset, signIn, signUp } from '../../api';
 import BrandMark from '../../components/common/BrandMark';
 import Field from '../../components/common/Field';
+import FormAlertModal from '../../components/common/FormAlertModal';
 import Notice from '../../components/common/Notice';
+import PasswordChecklist from '../../components/common/PasswordChecklist';
+import { passwordErrors, validateEmail } from '../../utils/validation';
 
 export default function Login() {
   const [mode, setMode] = useState('login');
@@ -14,36 +17,51 @@ export default function Login() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [formErrors, setFormErrors] = useState([]);
+
+  function showErrors(errors) {
+    setFormErrors((Array.isArray(errors) ? errors : [errors]).filter(Boolean));
+  }
 
   async function submit(event) {
     event.preventDefault();
-    setError('');
+    setFormErrors([]);
     setMessage('');
 
-    if (mode === 'signup' && password !== confirmPassword) {
-      setError('Passwords do not match. Please re-enter your password.');
+    const emailError = validateEmail(email);
+    const errors = emailError ? [emailError] : [];
+
+    if (!mode || mode === 'login') {
+      if (!password) errors.push('Password is required.');
+    }
+
+    if (mode === 'signup') {
+      errors.push(...passwordErrors(password, email));
+      if (password !== confirmPassword) errors.push('Passwords do not match. Please re-enter your confirmation password.');
+    }
+
+    if (errors.length) {
+      showErrors(errors);
       return;
     }
 
     setBusy(true);
-
     try {
       if (mode === 'login') {
-        await signIn(email, password);
+        await signIn(email.trim(), password);
       } else if (mode === 'signup') {
-        const data = await signUp(email, password);
+        const data = await signUp(email.trim(), password);
         if (!data.session) {
           setMessage('Account created. Check your email to confirm your account, then sign in.');
         } else {
           setMessage('Account created.');
         }
       } else {
-        await requestPasswordReset(email);
+        await requestPasswordReset(email.trim());
         setMessage('Password reset link sent. Check your email and open the link to create a new password.');
       }
     } catch (err) {
-      setError(err.message || 'Unable to continue.');
+      showErrors(err?.message || 'Unable to continue. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -55,7 +73,7 @@ export default function Login() {
     setConfirmPassword('');
     setShowPassword(false);
     setShowConfirmPassword(false);
-    setError('');
+    setFormErrors([]);
     setMessage('');
   }
 
@@ -77,7 +95,7 @@ export default function Login() {
         <div className="login-message">
           <span className="eyebrow">ATHLETE'S PAYOUT SYSTEM</span>
           <h1>
-            YOUR INFLUENCE.
+            YOUR INFLUENCE
             <br />
             <em>YOUR EARNINGS</em>
           </h1>
@@ -86,9 +104,9 @@ export default function Login() {
       </div>
 
       <div className="login-right">
-        <form className="auth-card login-card" onSubmit={submit}>
+        <form className="auth-card login-card" onSubmit={submit} noValidate>
           <span className="eyebrow">
-            {isLogin ? 'WELCOME BACK ATHLETE' : isSignup ? 'NEW ATHLETE' : 'ACCOUNT RECOVERY'}
+            {isLogin ? 'WELCOME BACK' : isSignup ? 'NEW ATHLETE' : 'ACCOUNT RECOVERY'}
           </span>
           <h2>
             {isLogin ? 'Sign in to continue' : isSignup ? 'Create athlete account' : 'Forgot your password?'}
@@ -97,11 +115,10 @@ export default function Login() {
             {isLogin
               ? 'Use the email and password for your account.'
               : isSignup
-                ? 'After signup, complete your payment profile.'
+                ? 'Create a secure account first. After signup, complete your athlete application for admin approval.'
                 : 'Enter your account email and we will send you a password reset link.'}
           </p>
 
-          {error && <Notice type="error">{error}</Notice>}
           {message && <Notice type="success">{message}</Notice>}
 
           <Field label="Email">
@@ -110,10 +127,12 @@ export default function Login() {
               <input
                 type="email"
                 required
+                maxLength="254"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 autoComplete="email"
-                placeholder={isForgot ? 'you@example.com' : undefined}
+                inputMode="email"
+                placeholder="you@example.com"
               />
             </div>
           </Field>
@@ -123,7 +142,8 @@ export default function Login() {
               <div className="password-wrap">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  minLength="8"
+                  minLength={isSignup ? 8 : 1}
+                  maxLength="128"
                   required
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -142,6 +162,8 @@ export default function Login() {
             </Field>
           )}
 
+          {isSignup && <PasswordChecklist password={password} />}
+
           {isLogin && (
             <button type="button" className="forgot-password-btn" onClick={() => changeMode('forgot')}>
               Forgot password?
@@ -154,6 +176,7 @@ export default function Login() {
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   minLength="8"
+                  maxLength="128"
                   required
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
@@ -192,6 +215,12 @@ export default function Login() {
           </small>
         </form>
       </div>
+
+      <FormAlertModal
+        open={formErrors.length > 0}
+        errors={formErrors}
+        onClose={() => setFormErrors([])}
+      />
     </div>
   );
 }

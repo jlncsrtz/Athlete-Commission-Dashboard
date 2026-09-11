@@ -281,6 +281,33 @@ begin
 end;
 $$;
 
+-- Current athlete application approval flow.
+-- Approval is independent of affiliates.commission_rate; product commission is configured separately.
+create or replace function public.admin_approve_affiliate_application(
+  p_affiliate_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then raise exception 'Admin access required'; end if;
+
+  update public.affiliates
+  set status = 'approved',
+      approved_at = coalesce(approved_at, now())
+  where id = p_affiliate_id
+    and status = 'pending';
+
+  if not found then raise exception 'Pending athlete application not found'; end if;
+
+  update public.payout_accounts
+  set verified_at = now(), updated_at = now()
+  where affiliate_id = p_affiliate_id;
+end;
+$$;
+
 -- Admin enters a manual sale. Confirmed sales automatically create commission using the affiliate's server-side rate.
 create or replace function public.admin_create_sale(
   p_affiliate_id uuid,
@@ -577,6 +604,7 @@ for delete to authenticated using (bucket_id = 'payout-receipts' and public.is_a
 revoke all on function public.complete_affiliate_onboarding(text,text,text,text,text,text,text,text) from public, anon;
 revoke all on function public.update_my_payout_profile(text,text,text,text,text,text,text) from public, anon;
 revoke all on function public.admin_review_affiliate(uuid,public.affiliate_status,numeric) from public, anon;
+revoke all on function public.admin_approve_affiliate_application(uuid) from public, anon;
 revoke all on function public.admin_create_sale(uuid,text,date,text,integer,numeric,public.order_status,text) from public, anon;
 revoke all on function public.admin_update_order_status(uuid,public.order_status) from public, anon;
 revoke all on function public.admin_create_payout(uuid,date,date) from public, anon;
@@ -585,6 +613,7 @@ revoke all on function public.admin_mark_payout_paid(uuid,text,text,text,text) f
 grant execute on function public.complete_affiliate_onboarding(text,text,text,text,text,text,text,text) to authenticated;
 grant execute on function public.update_my_payout_profile(text,text,text,text,text,text,text) to authenticated;
 grant execute on function public.admin_review_affiliate(uuid,public.affiliate_status,numeric) to authenticated;
+grant execute on function public.admin_approve_affiliate_application(uuid) to authenticated;
 grant execute on function public.admin_create_sale(uuid,text,date,text,integer,numeric,public.order_status,text) to authenticated;
 grant execute on function public.admin_update_order_status(uuid,public.order_status) to authenticated;
 grant execute on function public.admin_create_payout(uuid,date,date) to authenticated;

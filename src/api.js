@@ -1,4 +1,5 @@
 import { requireSupabase } from './supabase';
+import { passwordErrors, validateProfileForm } from './utils/validation';
 
 export async function getSessionUser() {
   const client = requireSupabase();
@@ -16,8 +17,10 @@ export async function signIn(email, password) {
 
 export async function signUp(email, password) {
   const client = requireSupabase();
+  const securePasswordErrors = passwordErrors(password, email);
+  if (securePasswordErrors.length) throw new Error(securePasswordErrors.join(' • '));
   const { data, error } = await client.auth.signUp({
-    email,
+    email: email.trim(),
     password,
     options: { emailRedirectTo: window.location.origin },
   });
@@ -41,7 +44,8 @@ export async function requestPasswordReset(email) {
 
 export async function updateMyPassword(password) {
   const client = requireSupabase();
-  if (!password || password.length < 8) throw new Error('Password must be at least 8 characters.');
+  const securePasswordErrors = passwordErrors(password);
+  if (securePasswordErrors.length) throw new Error(securePasswordErrors.join(' • '));
   const { data, error } = await client.auth.updateUser({ password });
   if (error) throw error;
   return data;
@@ -52,7 +56,7 @@ export async function loadMyAccount() {
   const user = await getSessionUser();
   const { data: profile, error: profileError } = await client
     .from('profiles')
-    .select('id, role, full_name, email, mobile_number')
+    .select('id, role, full_name, first_name, middle_name, last_name, address, email, mobile_number')
     .eq('id', user.id)
     .single();
   if (profileError) throw profileError;
@@ -85,8 +89,12 @@ export async function loadMyAccount() {
 export async function uploadMyQr(userId, file) {
   const client = requireSupabase();
   if (!file) return null;
+  const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+  if (!allowedTypes.includes(file.type)) throw new Error('QR upload must be a PNG, JPG/JPEG, or WEBP image.');
+  if (file.size <= 0) throw new Error('The selected QR image is empty.');
   if (file.size > 5 * 1024 * 1024) throw new Error('QR image must be 5 MB or smaller.');
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!['png', 'jpg', 'jpeg', 'webp'].includes(ext)) throw new Error('QR image has an unsupported file extension.');
   const path = `${userId}/qr-${Date.now()}.${ext || 'jpg'}`;
   const { error } = await client.storage.from('affiliate-qr').upload(path, file, {
     cacheControl: '3600',
@@ -105,10 +113,70 @@ export async function signedImage(bucket, path, expiresIn = 900) {
   return data?.signedUrl || null;
 }
 
+async function edgeFunctionErrorMessage(error) {
+  let message = error?.message || 'Email notification failed.';
+
+  try {
+    const response = error?.context;
+    if (response && typeof response.clone === 'function') {
+      const payload = await response.clone().json();
+      message = payload?.error || payload?.message || message;
+    }
+  } catch {
+    // Keep the original Supabase Functions error message when the response body is not JSON.
+  }
+
+  return message;
+}
+
+async function notifyAthleteApplication(event, affiliateId) {
+  const client = requireSupabase();
+
+  try {
+    const { data: sessionData, error: sessionError } = await client.auth.getSession();
+    if (sessionError) throw sessionError;
+
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      return { emailSent: false, emailError: 'No active login session for the email notification.' };
+    }
+
+    const { data, error } = await client.functions.invoke('athlete-application-email', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: { event, affiliate_id: affiliateId },
+    });
+
+    if (error) {
+      return { emailSent: false, emailError: await edgeFunctionErrorMessage(error) };
+    }
+
+    if (data?.success === false || data?.email_sent === false) {
+      return {
+        emailSent: false,
+        emailError: data?.error || data?.message || 'The Edge Function did not send the email.',
+      };
+    }
+
+    return { emailSent: true, emailError: null };
+  } catch (error) {
+    console.warn('Athlete application email notification failed:', error);
+    return {
+      emailSent: false,
+      emailError: error?.message || 'Email notification failed.',
+    };
+  }
+}
+
 export async function completeOnboarding(values, qrCodePath) {
   const client = requireSupabase();
+  const formErrors = validateProfileForm(values, { includeAffiliateCode: true });
+  if (formErrors.length) throw new Error(formErrors.join(' • '));
+  if (!qrCodePath) throw new Error('A valid payout QR image is required.');
   const { data, error } = await client.rpc('complete_affiliate_onboarding', {
-    p_full_name: values.fullName.trim(),
+    p_first_name: values.firstName.trim(),
+    p_middle_name: values.middleName?.trim() || null,
+    p_last_name: values.lastName.trim(),
+    p_address: values.address.trim(),
     p_mobile_number: values.mobile.trim(),
     p_affiliate_code: values.affiliateCode.trim().toUpperCase(),
     p_payout_method: values.payoutMethod,
@@ -118,13 +186,19 @@ export async function completeOnboarding(values, qrCodePath) {
     p_qr_code_path: qrCodePath,
   });
   if (error) throw error;
+  await notifyAthleteApplication('submitted', data);
   return data;
 }
 
 export async function updateMyPayoutProfile(values, qrCodePath) {
   const client = requireSupabase();
+  const formErrors = validateProfileForm(values);
+  if (formErrors.length) throw new Error(formErrors.join(' • '));
   const { data, error } = await client.rpc('update_my_payout_profile', {
-    p_full_name: values.fullName.trim(),
+    p_first_name: values.firstName.trim(),
+    p_middle_name: values.middleName?.trim() || null,
+    p_last_name: values.lastName.trim(),
+    p_address: values.address.trim(),
     p_mobile_number: values.mobile.trim(),
     p_payout_method: values.payoutMethod,
     p_account_name: values.accountName.trim(),
@@ -133,6 +207,7 @@ export async function updateMyPayoutProfile(values, qrCodePath) {
     p_qr_code_path: qrCodePath || null,
   });
   if (error) throw error;
+  await notifyAthleteApplication('submitted', data);
   return data;
 }
 
@@ -152,7 +227,7 @@ export async function loadAffiliateData(affiliateId) {
 export async function loadAdminData() {
   const client = requireSupabase();
   const [affiliatesResult, ordersResult, commissionsResult, productsResult] = await Promise.all([
-    client.from('affiliates').select('id,user_id,affiliate_code,commission_rate,status,approved_at,created_at,profiles(full_name,email,mobile_number),payout_accounts(payout_method,account_name,account_number,bank_name,qr_code_path,verified_at)').order('created_at', { ascending: false }),
+    client.from('affiliates').select('id,user_id,affiliate_code,commission_rate,status,approved_at,created_at,profiles(full_name,first_name,middle_name,last_name,address,email,mobile_number),payout_accounts(payout_method,account_name,account_number,bank_name,qr_code_path,verified_at)').order('created_at', { ascending: false }),
     client.from('orders').select('id,external_order_number,affiliate_id,order_date,final_sale,status,order_items(product_name_snapshot,product_category_snapshot,commission_per_unit_snapshot,quantity,line_total),commissions(commission_rate,commission_amount,payment_status,payment_method,reference_number,receipt_path,paid_at)').order('order_date', { ascending: false }).limit(500),
     client.from('commissions').select('id,affiliate_id,order_id,commission_rate,qualified_sale,commission_amount,payment_status,payment_method,reference_number,receipt_path,paid_at,created_at').limit(1000),
     client.from('products').select('id,sku,name,category,selling_price,commission_price,active,created_at,updated_at').order('name'),
@@ -166,6 +241,22 @@ export async function loadAdminData() {
     commissions: commissionsResult.data || [],
     products: productsResult.data || [],
   };
+}
+
+
+export async function adminApproveAthleteApplication(affiliateId) {
+  // Approval and the approval email are handled by one authenticated Edge Function call.
+  // If email delivery fails, the Edge Function rolls the athlete back to pending so
+  // the admin never sees an approved athlete who was not notified.
+  const result = await notifyAthleteApplication('approved', affiliateId);
+  if (!result.emailSent) {
+    throw new Error(result.emailError || 'The athlete could not be approved because the approval email was not sent.');
+  }
+  return result;
+}
+
+export async function adminSendAthleteApprovalEmail(affiliateId) {
+  return notifyAthleteApplication('approved', affiliateId);
 }
 
 export async function adminCreateSale(values) {

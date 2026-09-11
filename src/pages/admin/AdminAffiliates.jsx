@@ -9,7 +9,7 @@ export default function AdminAffiliates({ data }) {
   const [selected, setSelected] = useState(null);
 
   const summaries = useMemo(
-    () => data.affiliates.map((athlete) => {
+    () => data.affiliates.filter((athlete) => athlete.status === 'approved').map((athlete) => {
       const profile = affiliateProfile(athlete);
       const payout = payoutAccount(athlete);
       const orders = data.orders.filter(

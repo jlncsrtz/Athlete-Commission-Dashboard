@@ -69,9 +69,13 @@ html,body,#root{max-width:100%;overflow-x:hidden}.mobile-logout-btn{display:none
   .sidebar{left:0;right:0;bottom:0;top:auto;width:100%!important;height:auto;min-height:70px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid #202321;display:block;background:rgba(7,8,8,.97);backdrop-filter:blur(16px);z-index:70}
   .sidebar.collapsed{width:100%!important}
   .side-top,.side-bottom{display:none!important}
-  .sidebar nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;width:100%;overflow:visible}
+  .sidebar nav{display:grid;gap:4px;width:100%;overflow:visible}
+  .sidebar.admin-sidebar nav{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .sidebar.athlete-sidebar nav{grid-template-columns:repeat(3,minmax(0,1fr))}
   .sidebar .nav-item,.sidebar .nav-item:nth-child(n+5){display:flex!important;min-width:0;min-height:56px;padding:7px 3px;gap:4px;flex-direction:column;justify-content:center;align-items:center;text-align:center;border-radius:9px}
   .sidebar .nav-item span{display:block!important;max-width:100%;font-size:9px;line-height:1.15;white-space:normal;overflow-wrap:anywhere}
+  .sidebar.admin-sidebar .nav-item{padding-left:2px;padding-right:2px}
+  .sidebar.admin-sidebar .nav-item span{font-size:8.5px;overflow-wrap:normal;word-break:normal}
   .sidebar .nav-item svg{width:18px;height:18px;flex:none}
   .sidebar .nav-item.active{box-shadow:inset 0 -3px 0 var(--accent)}
   main{width:100%;padding-bottom:0}
@@ -238,3 +242,53 @@ html,body,#root{max-width:100%;overflow-x:hidden}.mobile-logout-btn{display:none
   .login-right{padding:6px 12px 24px}
   .login-card{padding:22px 16px;border-radius:18px}
 }
+
+/* V13: athlete sale details view */
+.sale-view-btn{padding:8px 10px;min-height:34px;white-space:nowrap}.sale-details-modal{width:min(760px,95vw)}.sale-detail-status-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.sale-detail-status-row>div,.sale-detail-section{border:1px solid var(--line);background:#090a0a;border-radius:13px}.sale-detail-status-row>div{padding:12px 13px}.sale-detail-status-row span,.sale-detail-grid span{display:block;color:#787f7a;font-size:10px;margin-bottom:6px}.sale-detail-status-row strong{font-size:12px}.sale-detail-section{padding:14px;margin-top:10px}.sale-detail-section-title{display:flex;align-items:center;gap:8px;margin-bottom:12px;color:#dfe2df}.sale-detail-section-title svg{color:var(--accent)}.sale-detail-section-title strong{font-size:12px}.sale-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sale-detail-grid>div{border:1px solid #1d201e;background:#070808;border-radius:10px;padding:11px;min-width:0}.sale-detail-grid strong{display:block;font-size:12px;overflow-wrap:anywhere;white-space:normal}.sale-detail-grid .sale-detail-wide{grid-column:1/-1}.sale-detail-accent{color:var(--accent)}.sale-reference-value{font-size:13px!important;color:#f0f2ef}.sale-receipt-preview{border:1px dashed #303531;background:#070808;border-radius:11px;min-height:170px;display:grid;place-items:center;overflow:hidden}.sale-receipt-link{width:100%;padding:12px;color:#898f8b;text-decoration:none;text-align:center;font-size:10px}.sale-receipt-link img{display:block;max-width:100%;max-height:360px;object-fit:contain;margin:0 auto 8px;border-radius:9px}.sale-receipt-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#747a76;font-size:10px;padding:24px;text-align:center}
+@media(max-width:760px){.sale-details-modal{width:100%!important}.sale-detail-status-row,.sale-detail-grid{grid-template-columns:1fr}.sale-detail-grid .sale-detail-wide{grid-column:auto}.sale-receipt-preview{min-height:150px}.sale-receipt-link img{max-height:48dvh}.sale-view-btn{min-height:38px}}
+
+/* V14: athlete approval workflow, fixed desktop sidebar, and receipt popup */
+@media(min-width:761px){
+  .app-shell{display:block;padding-left:250px;min-height:100vh;transition:padding-left .2s}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:250px;height:100dvh;overflow:hidden}
+  .sidebar.collapsed{width:78px}
+  .app-shell:has(.sidebar.collapsed){padding-left:78px}
+  .sidebar nav{min-height:0;overflow-y:auto;overflow-x:hidden}
+  .side-bottom{flex:none;background:rgba(6,7,7,.98)}
+}
+.field-span-two{grid-column:1/-1}
+.field textarea{resize:vertical;min-height:92px}
+.approval-shell{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;min-height:100dvh;padding:24px}
+.approval-brand{width:min(560px,100%)}
+.approval-card{width:min(560px,100%);text-align:center;padding:34px}
+.approval-card h1{font-size:30px;margin:10px 0 10px}
+.approval-card>p{color:var(--muted);font-size:13px;line-height:1.7}
+.approval-icon{width:58px;height:58px;border-radius:18px;margin:0 auto 18px;background:#171d12;border:1px solid #33421d;color:var(--accent);display:grid;place-items:center}
+.approval-note{margin:22px 0 0;text-align:left;display:flex;align-items:flex-start;gap:11px;padding:14px;border:1px solid #28301d;background:#0b0e08;border-radius:12px}
+.approval-note svg{color:var(--accent);flex:none}.approval-note strong,.approval-note span{display:block;font-size:11px}.approval-note span{color:#7d847f;margin-top:4px;line-height:1.55}
+.approval-actions{display:flex;justify-content:center;gap:10px;margin-top:22px;flex-wrap:wrap}
+.pending-approval-banner{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;padding:14px 16px;border:1px solid #4a4b1c;background:linear-gradient(135deg,#171708,#0c0d08);border-radius:14px;color:#d7dcbe}
+.pending-approval-banner>svg{color:#f5d575;flex:none;margin-top:1px}.pending-approval-banner strong,.pending-approval-banner span{display:block}.pending-approval-banner strong{font-size:12px}.pending-approval-banner span{font-size:10px;color:#90977f;margin-top:4px}
+.pending-athlete-row{background:rgba(245,213,117,.035)}
+.athlete-detail-hero span .pill{margin-left:4px;vertical-align:middle}
+.athlete-qr-review{margin-top:14px;padding:14px;border:1px solid var(--line);background:#080909;border-radius:13px;text-align:center}
+.athlete-qr-review img{display:block;max-width:260px;max-height:260px;object-fit:contain;margin:0 auto;border-radius:12px;background:#fff;padding:8px}
+.athlete-qr-empty{min-height:130px;display:flex;align-items:center;justify-content:center;gap:8px;color:#747a76;font-size:11px}
+.athlete-review-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.receipt-preview-button{border:0;background:transparent;cursor:zoom-in;font:inherit}
+.receipt-popup-modal{width:min(820px,95vw)}
+.receipt-popup-image{display:grid;place-items:center;min-height:320px;background:#070808;border:1px solid var(--line);border-radius:13px;padding:14px;overflow:auto}
+.receipt-popup-image img{display:block;max-width:100%;max-height:75dvh;object-fit:contain;border-radius:10px}
+@media(max-width:760px){
+  .app-shell{padding-left:0!important}
+  .field-span-two{grid-column:auto}
+  .approval-shell{padding:14px}.approval-card{padding:22px 17px}.approval-card h1{font-size:25px}.approval-actions{flex-direction:column}.approval-actions button{width:100%}
+  .athlete-review-actions{flex-direction:column}.athlete-review-actions button{width:100%}
+  .athlete-qr-review img{max-width:220px;max-height:220px}
+  .receipt-popup-modal{width:100%!important}.receipt-popup-image{min-height:240px}.receipt-popup-image img{max-height:68dvh}
+}
+
+/* V12: secure account + realistic athlete form validation */
+.form-section-caption{margin:4px 0 14px;padding:12px 14px;border:1px solid #20251c;background:#0a0c0a;border-radius:12px}.form-section-caption strong,.form-section-caption span{display:block}.form-section-caption strong{font-size:12px;color:#e9ece8}.form-section-caption span{font-size:10px;line-height:1.55;color:#737a75;margin-top:4px}.payout-section-caption{margin-top:20px}.upload-success-label{color:var(--accent)!important;font-weight:700}.password-checklist{margin:-2px 0 14px;padding:11px 12px;border:1px solid #232725;background:#080a09;border-radius:11px}.password-checklist>strong{display:block;font-size:10px;color:#9ba19d;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em}.password-check-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}.password-check-grid span{display:flex;align-items:center;gap:6px;color:#7c827e;font-size:10px;line-height:1.35}.password-check-grid span svg{color:#8d4542;flex:none}.password-check-grid span.passed{color:#b7c1b9}.password-check-grid span.passed svg{color:var(--accent)}.form-alert-modal{width:min(560px,94vw)}.form-alert-head{gap:14px}.form-alert-title{display:flex;align-items:flex-start;gap:12px;min-width:0}.form-alert-icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:#21100f;border:1px solid #5b2b29;color:#ff9f99;flex:none}.form-alert-modal .modal-head h2{font-size:25px;line-height:1.1}.form-alert-list{display:flex;flex-direction:column;gap:8px;margin:0 0 16px}.form-alert-item{display:grid;grid-template-columns:26px 1fr;gap:9px;align-items:start;border:1px solid #3c2321;background:#160d0c;border-radius:11px;padding:10px 11px}.form-alert-item>span{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;background:#2a1513;color:#ffaaa4;font-size:9px;font-weight:900}.form-alert-item p{font-size:11px;line-height:1.5;color:#f1c2be;padding-top:2px}.field input[inputmode="numeric"]{font-variant-numeric:tabular-nums;letter-spacing:.02em}
+@media(max-width:760px){.password-check-grid{grid-template-columns:1fr}.form-alert-modal{width:100%!important}.form-alert-modal .modal-head h2{font-size:22px}.form-section-caption{padding:11px 12px}}
+.password-checklist>small{display:block;color:#656c67;font-size:9px;line-height:1.45;margin-top:8px}

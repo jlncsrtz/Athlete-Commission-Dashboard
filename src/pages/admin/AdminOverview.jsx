@@ -11,12 +11,13 @@ export default function AdminOverview({ data, onAddSale }) {
     (sum, item) => sum + Number(item.commission_amount || 0),
     0,
   );
+  const pendingAthletes = data.affiliates.filter((athlete) => athlete.status === 'pending').length;
   const productsSold = confirmed.reduce(
     (sum, order) => sum + orderItems(order).reduce((qty, item) => qty + Number(item.quantity || 0), 0),
     0,
   );
 
-  const athleteLeaderboard = useMemo(() => data.affiliates.map((athlete) => {
+  const athleteLeaderboard = useMemo(() => data.affiliates.filter((athlete) => athlete.status === 'approved').map((athlete) => {
     const athleteOrders = confirmed.filter((order) => order.affiliate_id === athlete.id);
     const athleteCommissions = data.commissions.filter((item) => item.affiliate_id === athlete.id);
     const commission = athleteCommissions.reduce((sum, item) => sum + Number(item.commission_amount || 0), 0);
@@ -60,7 +61,7 @@ export default function AdminOverview({ data, onAddSale }) {
         <StatCard icon={ShoppingBag} label="Confirmed athlete sales" value={peso(totalSales)} accent />
         <StatCard icon={Package} label="Products sold" value={productsSold} />
         <StatCard icon={BadgeDollarSign} label="Commission earned" value={peso(totalCommission)} />
-        <StatCard icon={Users} label="Athlete accounts" value={data.affiliates.length} />
+        <StatCard icon={Users} label="Athlete accounts" value={data.affiliates.length} detail={pendingAthletes ? `${pendingAthletes} pending approval` : 'No pending applications'} />
       </div>
 
       <div className="panel dashboard-leaderboard-panel">

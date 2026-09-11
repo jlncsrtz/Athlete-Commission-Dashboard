@@ -14,7 +14,7 @@ export function cn(...parts) { return parts.filter(Boolean).join(' '); }
 export function relationOne(value) { return Array.isArray(value) ? value[0] || null : value || null; }
 export function orderCommission(order) { return relationOne(order?.commissions); }
 export function orderItems(order) { return Array.isArray(order?.order_items) ? order.order_items : order?.order_items ? [order.order_items] : []; }
-export function affiliateProfile(affiliate) { return relationOne(affiliate?.profiles) || { full_name: 'Unknown athlete', email: '', mobile_number: '' }; }
+export function affiliateProfile(affiliate) { return relationOne(affiliate?.profiles) || { full_name: 'Unknown athlete', first_name: '', middle_name: '', last_name: '', address: '', email: '', mobile_number: '' }; }
 export function payoutAccount(affiliate) { return relationOne(affiliate?.payout_accounts); }
 export function titleStatus(status) { return String(status || '').replaceAll('_', ' ').replace(/\b\w/g, (m) => m.toUpperCase()); }
 export function monthStart() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; }

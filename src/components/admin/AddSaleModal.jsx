@@ -193,10 +193,9 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
     try {
       if (!form.affiliateId) throw new Error('Select an athlete from the suggestions.');
       if (!form.productId) throw new Error('Select a product from the suggestions.');
-      if (directPaymentEnabled && !payment.ref.trim()) {
-        throw new Error('Enter the direct payment reference number.');
+      if (directPaymentEnabled && !payment.receipt) {
+        throw new Error('Upload a receipt image before saving a confirmed sale.');
       }
-
       const orderId = await adminCreateSale(form);
 
       if (directPaymentEnabled) {
@@ -392,10 +391,10 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
                         <option>GCash</option><option>Maya</option><option>BDO</option><option>BPI</option><option>UnionBank</option><option>Metrobank</option><option>Other Bank</option>
                       </select>
                     </Field>
-                    <Field label="Reference number">
-                      <input required value={payment.ref} onChange={(event) => setPayment({ ...payment, ref: event.target.value })} placeholder="Payment reference" />
+                    <Field label="Reference number (optional)">
+                      <input value={payment.ref} onChange={(event) => setPayment({ ...payment, ref: event.target.value })} placeholder="Payment reference (optional)" />
                     </Field>
-                    <Field label="Receipt (optional)">
+                    <Field label="Receipt image (required)">
                       <label className="file-inline-btn">
                         <ImagePlus size={15} /> {payment.receipt ? payment.receipt.name : 'Choose image'}
                         <input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setPayment({ ...payment, receipt: event.target.files?.[0] || null })} />

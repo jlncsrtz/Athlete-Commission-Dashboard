@@ -36,7 +36,7 @@ export default function PortalLayout({
 
   return (
     <div className="app-shell">
-      <aside className={collapsed ? 'sidebar collapsed' : 'sidebar'}>
+      <aside className={`${collapsed ? 'sidebar collapsed' : 'sidebar'} ${isAdmin ? 'admin-sidebar' : 'athlete-sidebar'}`}>
         <div className="side-top">
           <div className="side-brand">
             <BrandMark />
@@ -100,8 +100,9 @@ export default function PortalLayout({
               <ShieldCheck size={15} />
               {isAdmin ? 'Admin' : 'Athlete'}
             </div>
-            <button className="icon-btn mobile-logout-btn" onClick={onLogout} title="Log out" aria-label="Log out">
+            <button className="mobile-logout-btn" onClick={onLogout} title="Log out" aria-label="Log out">
               <LogOut size={16} />
+              <span>Log out</span>
             </button>
           </div>
         </header>

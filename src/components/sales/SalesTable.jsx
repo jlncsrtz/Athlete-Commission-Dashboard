@@ -1,8 +1,9 @@
 import React from 'react';
+import { Eye } from 'lucide-react';
 import StatusPill from '../common/StatusPill';
 import { dateLabel, peso } from '../../utils/helpers';
 
-export default function SalesTable({ sales, admin = false, onStatus }) {
+export default function SalesTable({ sales, admin = false, onStatus, onView }) {
   return (
     <div className="table-wrap">
       <table>
@@ -16,6 +17,7 @@ export default function SalesTable({ sales, admin = false, onStatus }) {
             <th>Sale</th>
             <th>Commission</th>
             <th>Status</th>
+            {onView && <th>Action</th>}
           </tr>
         </thead>
         <tbody>
@@ -43,6 +45,17 @@ export default function SalesTable({ sales, admin = false, onStatus }) {
                   <StatusPill status={sale.status} />
                 )}
               </td>
+              {onView && (
+                <td>
+                  <button
+                    type="button"
+                    className="secondary-btn sale-view-btn"
+                    onClick={() => onView(sale)}
+                  >
+                    <Eye size={15} /> View
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

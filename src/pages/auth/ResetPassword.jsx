@@ -3,7 +3,9 @@ import { CheckCircle2, Eye, EyeOff, KeyRound, RefreshCw } from 'lucide-react';
 import { updateMyPassword } from '../../api';
 import BrandMark from '../../components/common/BrandMark';
 import Field from '../../components/common/Field';
-import Notice from '../../components/common/Notice';
+import FormAlertModal from '../../components/common/FormAlertModal';
+import PasswordChecklist from '../../components/common/PasswordChecklist';
+import { passwordErrors } from '../../utils/validation';
 
 export default function ResetPassword({ onComplete }) {
   const [password, setPassword] = useState('');
@@ -12,14 +14,16 @@ export default function ResetPassword({ onComplete }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+  const [formErrors, setFormErrors] = useState([]);
 
   async function submit(event) {
     event.preventDefault();
-    setError('');
+    setFormErrors([]);
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+    const errors = passwordErrors(password);
+    if (password !== confirmPassword) errors.push('Passwords do not match.');
+    if (errors.length) {
+      setFormErrors(errors);
       return;
     }
 
@@ -30,7 +34,7 @@ export default function ResetPassword({ onComplete }) {
       setPassword('');
       setConfirmPassword('');
     } catch (err) {
-      setError(err.message || 'Unable to update password.');
+      setFormErrors([err?.message || 'Unable to update password.']);
     } finally {
       setBusy(false);
     }
@@ -61,19 +65,18 @@ export default function ResetPassword({ onComplete }) {
             <button className="primary-btn full" onClick={continueToPortal}>Continue to portal</button>
           </div>
         ) : (
-          <form onSubmit={submit}>
+          <form onSubmit={submit} noValidate>
             <div className="reset-icon"><KeyRound size={24} /></div>
             <span className="eyebrow">ACCOUNT RECOVERY</span>
             <h1>Create a new password.</h1>
-            <p className="reset-copy">Use at least 8 characters and make sure both password fields match.</p>
-
-            {error && <Notice type="error">{error}</Notice>}
+            <p className="reset-copy">Use a strong password that meets every security requirement below.</p>
 
             <Field label="New password">
               <div className="password-wrap">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   minLength="8"
+                  maxLength="128"
                   required
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -85,11 +88,14 @@ export default function ResetPassword({ onComplete }) {
               </div>
             </Field>
 
+            <PasswordChecklist password={password} />
+
             <Field label="Confirm new password">
               <div className="password-wrap">
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   minLength="8"
+                  maxLength="128"
                   required
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
@@ -108,6 +114,13 @@ export default function ResetPassword({ onComplete }) {
           </form>
         )}
       </div>
+
+      <FormAlertModal
+        open={formErrors.length > 0}
+        title="Password needs attention"
+        errors={formErrors}
+        onClose={() => setFormErrors([])}
+      />
     </div>
   );
 }
