@@ -155,7 +155,7 @@ export default function AffiliateSales({ orders }) {
               <Clock3 size={18} />
               <div>
                 <strong>Approved commission</strong>
-                <span>This can move to Confirmed starting the next calendar day after admin approval.</span>
+                <span>This automatically becomes Confirmed on the next calendar day. Admin may also confirm it earlier.</span>
               </div>
             </div>
           )}

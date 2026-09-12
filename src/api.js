@@ -216,7 +216,7 @@ export async function loadAffiliateData(affiliateId) {
   const [{ data: orders, error: ordersError }] = await Promise.all([
     client
       .from('orders')
-      .select('id, external_order_number, order_date, final_sale, status, commission_approved_at, order_items(product_name_snapshot, product_category_snapshot, commission_per_unit_snapshot, quantity, line_total), commissions(commission_rate, commission_amount, payment_status, payment_method, reference_number, receipt_path, paid_at)')
+      .select('id, external_order_number, order_date, final_sale, status, commission_approved_at, commission_payment_method, commission_reference_number, commission_receipt_path, commission_payment_recorded_at, order_items(product_name_snapshot, product_category_snapshot, commission_per_unit_snapshot, quantity, line_total), commissions(commission_rate, commission_amount, payment_status, payment_method, reference_number, receipt_path, paid_at)')
       .eq('affiliate_id', affiliateId)
       .order('order_date', { ascending: false }),
   ]);
@@ -228,7 +228,7 @@ export async function loadAdminData() {
   const client = requireSupabase();
   const [affiliatesResult, ordersResult, commissionsResult, productsResult] = await Promise.all([
     client.from('affiliates').select('id,user_id,affiliate_code,commission_rate,status,approved_at,created_at,profiles(full_name,first_name,middle_name,last_name,address,email,mobile_number),payout_accounts(payout_method,account_name,account_number,bank_name,qr_code_path,verified_at)').order('created_at', { ascending: false }),
-    client.from('orders').select('id,external_order_number,affiliate_id,order_date,final_sale,status,commission_approved_at,order_items(product_name_snapshot,product_category_snapshot,commission_per_unit_snapshot,quantity,line_total),commissions(commission_rate,commission_amount,payment_status,payment_method,reference_number,receipt_path,paid_at)').order('order_date', { ascending: false }).limit(500),
+    client.from('orders').select('id,external_order_number,affiliate_id,order_date,final_sale,status,commission_approved_at,commission_payment_method,commission_reference_number,commission_receipt_path,commission_payment_recorded_at,order_items(product_name_snapshot,product_category_snapshot,commission_per_unit_snapshot,quantity,line_total),commissions(commission_rate,commission_amount,payment_status,payment_method,reference_number,receipt_path,paid_at)').order('order_date', { ascending: false }).limit(500),
     client.from('commissions').select('id,affiliate_id,order_id,commission_rate,qualified_sale,commission_amount,payment_status,payment_method,reference_number,receipt_path,paid_at,created_at').limit(1000),
     client.from('products').select('id,sku,name,category,selling_price,commission_price,active,created_at,updated_at').order('name'),
   ]);
@@ -327,6 +327,18 @@ export async function adminMarkCommissionPaid(orderId, values, receiptPath = nul
     p_order_id: orderId,
     p_payment_method: values.method,
     p_reference_number: values.ref.trim(),
+    p_receipt_path: receiptPath,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function adminApproveOrderWithPayment(orderId, values, receiptPath) {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc('admin_approve_order_with_payment', {
+    p_order_id: orderId,
+    p_payment_method: values.method,
+    p_reference_number: values.ref?.trim() || null,
     p_receipt_path: receiptPath,
   });
   if (error) throw error;

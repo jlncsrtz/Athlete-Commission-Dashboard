@@ -15,6 +15,7 @@ import {
   adminCreateSale,
   adminCreateHistoricalConfirmedSale,
   adminMarkCommissionPaid,
+  adminApproveOrderWithPayment,
   adminUpdateOrderStatus,
   signedImage,
   uploadCommissionReceipt,
@@ -99,7 +100,7 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
   const quantity = Math.max(0, Number(form.quantity || 0));
   const estimatedSale = quantity * Number(form.unitPrice || 0);
   const estimatedCommission = quantity * Number(form.commissionPrice || 0);
-  const directPaymentEnabled = false;
+  const directPaymentEnabled = form.status === 'approved' || form.status === 'confirmed';
 
   useEffect(() => {
     let active = true;
@@ -199,24 +200,26 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
       if (!form.affiliateId) throw new Error('Select an athlete from the suggestions.');
       if (!form.productId) throw new Error('Select a product from the suggestions.');
       if (directPaymentEnabled && !payment.receipt) {
-        throw new Error('Upload a receipt image before saving a confirmed sale.');
+        throw new Error('Upload a payment receipt image before saving this sale.');
       }
-      // Normal orders start as Pending and use the protected status workflow.
-      // Confirmed is the one intentional exception here: it imports an already-confirmed
-      // historical commission through a dedicated admin-only database function.
+
+      // Normal orders are created as Pending first.
+      // Approved requires payment details, while direct Confirmed is reserved for
+      // importing historical/past commissions.
       const orderId = form.status === 'confirmed'
         ? await adminCreateHistoricalConfirmedSale(form)
         : await adminCreateSale({ ...form, status: 'pending' });
 
-      if (form.status === 'approved' || form.status === 'cancelled') {
-        await adminUpdateOrderStatus(orderId, form.status);
+      let receiptPath = null;
+      if (directPaymentEnabled && payment.receipt) {
+        receiptPath = await uploadCommissionReceipt(selectedAthlete.user_id, orderId, payment.receipt);
       }
 
-      if (directPaymentEnabled) {
-        let receiptPath = null;
-        if (payment.receipt) {
-          receiptPath = await uploadCommissionReceipt(selectedAthlete.user_id, orderId, payment.receipt);
-        }
+      if (form.status === 'approved') {
+        await adminApproveOrderWithPayment(orderId, payment, receiptPath);
+      } else if (form.status === 'cancelled') {
+        await adminUpdateOrderStatus(orderId, 'cancelled');
+      } else if (form.status === 'confirmed') {
         await adminMarkCommissionPaid(orderId, payment, receiptPath);
       }
 
@@ -393,22 +396,22 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
                 <div className="direct-payment-title-row">
                   <div>
                     <strong>Commission workflow</strong>
-                    <span>New sales: Pending → Approved → Confirmed. For past commissions, you may select Confirmed directly when adding the historical sale. Cancelled closes the order.</span>
+                    <span>Approved shows the payment fields below. Approved sales automatically become Confirmed the next day, while past commissions may still be entered directly as Confirmed.</span>
                   </div>
                   <span className="direct-default-pill">WORKFLOW</span>
                 </div>
 
                 {directPaymentEnabled && (
                   <div className="field-grid three direct-payment-fields">
-                    <Field label="Payment method">
+                    <Field label="Mode of payment">
                       <select value={payment.method} onChange={(event) => setPayment({ ...payment, method: event.target.value })}>
-                        <option>GCash</option><option>Maya</option><option>BDO</option><option>BPI</option><option>UnionBank</option><option>Metrobank</option><option>Other Bank</option>
+                        <option>GCash</option><option>Maya</option><option>MariBank</option><option>GoTyme Bank</option><option>BDO</option><option>BPI</option><option>UnionBank</option><option>Metrobank</option><option>Other Bank</option>
                       </select>
                     </Field>
                     <Field label="Reference number (optional)">
                       <input value={payment.ref} onChange={(event) => setPayment({ ...payment, ref: event.target.value })} placeholder="Payment reference (optional)" />
                     </Field>
-                    <Field label="Receipt image (required)">
+                    <Field label="Payment receipt / QR proof (required)">
                       <label className="file-inline-btn">
                         <ImagePlus size={15} /> {payment.receipt ? payment.receipt.name : 'Choose image'}
                         <input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setPayment({ ...payment, receipt: event.target.files?.[0] || null })} />

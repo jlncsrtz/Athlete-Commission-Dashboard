@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Filter, Plus, Search, X } from 'lucide-react';
-import { adminUpdateOrderStatus } from '../../api';
+import { CreditCard, Eye, Filter, ImagePlus, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { adminApproveOrderWithPayment, adminUpdateOrderStatus, signedImage, uploadCommissionReceipt } from '../../api';
 import FormAlertModal from '../../components/common/FormAlertModal';
+import Field from '../../components/common/Field';
+import Modal from '../../components/common/Modal';
 import PageHeader from '../../components/common/PageHeader';
-import { affiliateProfile, canConfirmApprovedSale, dateLabel, peso, salesFromOrders } from '../../utils/helpers';
+import { affiliateProfile, dateLabel, payoutAccount, peso, salesFromOrders } from '../../utils/helpers';
 
 export default function AdminOrders({ data, onRefresh, onAddSale }) {
   const [busyId, setBusyId] = useState(null);
@@ -12,6 +14,10 @@ export default function AdminOrders({ data, onRefresh, onAddSale }) {
   const [productQuery, setProductQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [category, setCategory] = useState('all');
+  const [approvalSale, setApprovalSale] = useState(null);
+  const [approvalPayment, setApprovalPayment] = useState({ method: 'GCash', ref: '', receipt: null });
+  const [approvalQrUrl, setApprovalQrUrl] = useState('');
+  const [approvalBusy, setApprovalBusy] = useState(false);
 
   const sales = useMemo(
     () => salesFromOrders(data.orders).map((sale) => ({
@@ -43,20 +49,14 @@ export default function AdminOrders({ data, onRefresh, onAddSale }) {
     if (value === current) return '';
 
     if (current === 'pending') {
-      if (value === 'confirmed') {
-        return 'You cannot skip Approved. Move this sale from Pending to Approved first, then Confirmed becomes available starting the next calendar day.';
-      }
-      if (!['approved', 'cancelled'].includes(value)) {
-        return 'Pending sales can only move to Approved or Cancelled.';
+      if (!['approved', 'confirmed', 'cancelled'].includes(value)) {
+        return 'Pending sales can only move to Approved, Confirmed, or Cancelled.';
       }
     }
 
     if (current === 'approved') {
       if (value === 'pending') {
         return 'Approved sales cannot move backward to Pending.';
-      }
-      if (value === 'confirmed' && !canConfirmApprovedSale(sale)) {
-        return 'This sale was approved today. Confirmed / Commission Earned becomes available starting tomorrow.';
       }
       if (!['confirmed', 'cancelled'].includes(value)) {
         return 'Approved sales can only move to Confirmed or Cancelled.';
@@ -74,7 +74,75 @@ export default function AdminOrders({ data, onRefresh, onAddSale }) {
     return '';
   }
 
+  async function openApprovalPayment(sale) {
+    const payout = payoutAccount(sale.affiliate || {});
+    setApprovalSale(sale);
+    setApprovalPayment({
+      method: payout?.payout_method || 'GCash',
+      ref: '',
+      receipt: null,
+    });
+    setApprovalQrUrl('');
+
+    if (payout?.qr_code_path) {
+      try {
+        const url = await signedImage('affiliate-qr', payout.qr_code_path);
+        setApprovalQrUrl(url || '');
+      } catch {
+        setApprovalQrUrl('');
+      }
+    }
+  }
+
+  async function saveApprovedPayment(event) {
+    event.preventDefault();
+    if (!approvalSale) return;
+    if (!approvalPayment.receipt) {
+      setStatusAlert({
+        open: true,
+        title: 'Payment receipt required',
+        errors: ['Upload the payment receipt / QR proof before approving this sale.'],
+      });
+      return;
+    }
+
+    const athlete = approvalSale.affiliate;
+    if (!athlete?.user_id) {
+      setStatusAlert({
+        open: true,
+        title: 'Athlete account missing',
+        errors: ['The selected athlete does not have a valid user account for receipt storage.'],
+      });
+      return;
+    }
+
+    setApprovalBusy(true);
+    try {
+      const receiptPath = await uploadCommissionReceipt(
+        athlete.user_id,
+        approvalSale.raw.id,
+        approvalPayment.receipt,
+      );
+      await adminApproveOrderWithPayment(approvalSale.raw.id, approvalPayment, receiptPath);
+      setApprovalSale(null);
+      await onRefresh();
+    } catch (err) {
+      setStatusAlert({
+        open: true,
+        title: 'Unable to approve sale',
+        errors: [err?.message || 'The sale could not be approved with its payment details.'],
+      });
+    } finally {
+      setApprovalBusy(false);
+    }
+  }
+
   async function updateStatus(sale, value) {
+    if (value === 'approved' && sale.status === 'pending') {
+      await openApprovalPayment(sale);
+      return;
+    }
+
     const validationMessage = transitionError(sale, value);
     if (validationMessage) {
       setStatusAlert({
@@ -116,7 +184,7 @@ export default function AdminOrders({ data, onRefresh, onAddSale }) {
       <PageHeader
         eyebrow="ORDERS"
         title="Athlete sales"
-        subtitle="Order status workflow: Pending → Approved → Confirmed. Confirmed becomes available starting the next calendar day after approval."
+        subtitle="Approved sales automatically become Confirmed the next day. Admin can also manually select Confirmed anytime."
         action={<button className="primary-btn" onClick={onAddSale}><Plus size={17} /> Add sale</button>}
       />
 
@@ -164,7 +232,6 @@ export default function AdminOrders({ data, onRefresh, onAddSale }) {
             </thead>
             <tbody>
               {filtered.map((sale) => {
-                const confirmLocked = sale.status === 'approved' && !canConfirmApprovedSale(sale);
                 return (
                   <tr key={sale.raw.id}>
                     <td className="mono">#{sale.id}</td>
@@ -191,7 +258,7 @@ export default function AdminOrders({ data, onRefresh, onAddSale }) {
                           <option value="confirmed">Confirmed</option>
                           <option value="cancelled">Cancelled</option>
                         </select>
-                        {confirmLocked && <small>Confirmed is available tomorrow.</small>}
+                        {sale.status === 'approved' && <small>Auto-confirms next day. Manual Confirmed is also allowed.</small>}
                         {sale.status === 'confirmed' && <small>Commission is confirmed.</small>}
                         {sale.status === 'cancelled' && <small>Cancelled orders are final.</small>}
                       </div>
@@ -204,6 +271,109 @@ export default function AdminOrders({ data, onRefresh, onAddSale }) {
           {!filtered.length && <div className="empty">No athlete sales match your filters.</div>}
         </div>
       </div>
+
+      {approvalSale && (() => {
+        const athlete = approvalSale.affiliate || {};
+        const payout = payoutAccount(athlete);
+        const profile = affiliateProfile(athlete);
+
+        return (
+          <Modal onClose={() => !approvalBusy && setApprovalSale(null)} className="modal-xlarge add-sale-modal approval-payment-modal">
+            <form onSubmit={saveApprovedPayment} className="modal-form">
+              <div className="modal-head">
+                <div>
+                  <span className="eyebrow">APPROVE COMMISSION</span>
+                  <h2>Send payment details</h2>
+                  <p>Enter the payment details and receipt before setting this sale to Approved.</p>
+                </div>
+                <button type="button" className="icon-btn" disabled={approvalBusy} onClick={() => setApprovalSale(null)}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="add-sale-layout compact-payment-layout">
+                <div className="add-sale-main">
+                  <div className="panel-lite">
+                    <strong>Order #{approvalSale.id}</strong>
+                    <span>{profile.full_name || 'Athlete'} · {approvalSale.product} · {peso(approvalSale.commission)} commission</span>
+                  </div>
+
+                  <div className="field-grid three direct-payment-fields">
+                    <Field label="Mode of payment">
+                      <select
+                        value={approvalPayment.method}
+                        onChange={(event) => setApprovalPayment({ ...approvalPayment, method: event.target.value })}
+                      >
+                        <option>GCash</option><option>Maya</option><option>MariBank</option><option>GoTyme Bank</option><option>BDO</option><option>BPI</option><option>UnionBank</option><option>Metrobank</option><option>Other Bank</option>
+                      </select>
+                    </Field>
+
+                    <Field label="Reference number (optional)">
+                      <input
+                        value={approvalPayment.ref}
+                        onChange={(event) => setApprovalPayment({ ...approvalPayment, ref: event.target.value })}
+                        placeholder="Payment reference (optional)"
+                      />
+                    </Field>
+
+                    <Field label="Payment receipt / QR proof (required)">
+                      <label className="file-inline-btn">
+                        <ImagePlus size={15} />
+                        {approvalPayment.receipt ? approvalPayment.receipt.name : 'Choose image'}
+                        <input
+                          hidden
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={(event) => setApprovalPayment({
+                            ...approvalPayment,
+                            receipt: event.target.files?.[0] || null,
+                          })}
+                        />
+                      </label>
+                    </Field>
+                  </div>
+
+                  <button className="primary-btn full" disabled={approvalBusy}>
+                    {approvalBusy ? <RefreshCw className="spin" size={17} /> : <CreditCard size={17} />}
+                    Approve & save payment
+                  </button>
+                </div>
+
+                <aside className="athlete-payout-preview compact-payout-preview">
+                  <div className="payout-preview-title">
+                    <CreditCard size={18} />
+                    <div>
+                      <span className="eyebrow">ATHLETE PAYMENT DETAILS</span>
+                      <strong>{profile.full_name || 'Athlete'}</strong>
+                    </div>
+                  </div>
+
+                  <div className="qr-preview-box inline-athlete-qr">
+                    {approvalQrUrl ? (
+                      <img src={approvalQrUrl} alt="Athlete payment QR" />
+                    ) : (
+                      <div className="qr-placeholder"><CreditCard size={24} /><span>No QR uploaded</span></div>
+                    )}
+                  </div>
+
+                  {approvalQrUrl && (
+                    <a className="secondary-btn full view-qr-popup-btn" href={approvalQrUrl} target="_blank" rel="noreferrer">
+                      <Eye size={16} /> View QR code
+                    </a>
+                  )}
+
+                  <div className="payout-preview-details compact-details">
+                    <div><span>Method</span><strong>{payout?.payout_method || '—'}</strong></div>
+                    <div><span>Account name</span><strong>{payout?.account_name || '—'}</strong></div>
+                    <div><span>Account number</span><strong className="mono">{payout?.account_number || '—'}</strong></div>
+                    <div><span>Bank</span><strong>{payout?.bank_name || '—'}</strong></div>
+                  </div>
+                </aside>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
 
       <FormAlertModal
         open={statusAlert.open}

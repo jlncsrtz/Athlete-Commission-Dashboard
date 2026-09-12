@@ -1,11 +1,27 @@
 import React, { useMemo } from 'react';
-import { BadgeDollarSign, Package, Plus, ShoppingBag, Trophy, Users } from 'lucide-react';
+import { BadgeCheck, BadgeDollarSign, CheckCircle2, Clock3, Package, Plus, ShoppingBag, Trophy, Users } from 'lucide-react';
 import PageHeader from '../../components/common/PageHeader';
 import StatCard from '../../components/common/StatCard';
-import { affiliateProfile, orderItems, peso } from '../../utils/helpers';
+import { affiliateProfile, estimatedCommissionFromOrder, orderItems, peso } from '../../utils/helpers';
 
 export default function AdminOverview({ data, onAddSale }) {
+  const pending = data.orders.filter((order) => order.status === 'pending');
+  const approved = data.orders.filter((order) => order.status === 'approved');
   const confirmed = data.orders.filter((order) => order.status === 'confirmed');
+
+  const pendingCommission = pending.reduce(
+    (sum, order) => sum + estimatedCommissionFromOrder(order),
+    0,
+  );
+  const approvedCommission = approved.reduce(
+    (sum, order) => sum + estimatedCommissionFromOrder(order),
+    0,
+  );
+  const confirmedCommission = confirmed.reduce(
+    (sum, order) => sum + estimatedCommissionFromOrder(order),
+    0,
+  );
+
   const totalSales = confirmed.reduce((sum, order) => sum + Number(order.final_sale || 0), 0);
   const totalCommission = data.commissions.reduce(
     (sum, item) => sum + Number(item.commission_amount || 0),
@@ -62,6 +78,35 @@ export default function AdminOverview({ data, onAddSale }) {
         <StatCard icon={Package} label="Products sold" value={productsSold} />
         <StatCard icon={BadgeDollarSign} label="Commission earned" value={peso(totalCommission)} />
         <StatCard icon={Users} label="Athlete accounts" value={data.affiliates.length} detail={pendingAthletes ? `${pendingAthletes} pending approval` : 'No pending applications'} />
+      </div>
+
+      <div className="section-title-row admin-workflow-heading">
+        <div>
+          <span className="eyebrow">COMMISSION WORKFLOW</span>
+          <h3>Sales status overview</h3>
+        </div>
+      </div>
+
+      <div className="stats-grid three admin-workflow-stats">
+        <StatCard
+          icon={Clock3}
+          label="Pending"
+          value={pending.length}
+          detail={`${peso(pendingCommission)} potential commission`}
+        />
+        <StatCard
+          icon={BadgeCheck}
+          label="Approved"
+          value={approved.length}
+          detail={`${peso(approvedCommission)} approved • auto-confirms next day`}
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label="Confirmed"
+          value={confirmed.length}
+          detail={`${peso(confirmedCommission)} confirmed commission`}
+          accent
+        />
       </div>
 
       <div className="panel dashboard-leaderboard-panel">
