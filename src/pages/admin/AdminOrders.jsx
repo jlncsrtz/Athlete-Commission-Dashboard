@@ -248,7 +248,7 @@ export default function AdminOrders({ data, onRefresh, onAddSale }) {
                     <td>
                       <div className="order-status-control">
                         <select
-                          className="status-select order-status-select"
+                          className={`status-select order-status-select status-${sale.status}`}
                           value={sale.status}
                           disabled={busyId === sale.raw.id}
                           onChange={(event) => updateStatus(sale, event.target.value)}

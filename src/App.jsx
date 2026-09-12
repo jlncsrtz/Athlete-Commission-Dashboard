@@ -127,7 +127,7 @@ export default function App() {
   if (isAdmin) {
     if (!data) return <Loading />;
     if (page === 'applications') content = <AdminApplications data={data} onRefresh={refreshData} />;
-    else if (page === 'affiliates') content = <AdminAffiliates data={data} />;
+    else if (page === 'affiliates') content = <AdminAffiliates data={data} onRefresh={refreshData} />;
     else if (page === 'orders') content = <AdminOrders data={data} onRefresh={refreshData} onAddSale={() => setAddSale(true)} />;
     else if (page === 'products') content = <AdminProducts data={data} onRefresh={refreshData} />;
     else content = <AdminOverview data={data} onAddSale={() => setAddSale(true)} />;

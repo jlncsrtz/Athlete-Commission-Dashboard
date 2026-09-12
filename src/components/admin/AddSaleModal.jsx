@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -15,7 +15,6 @@ import {
   adminCreateSale,
   adminCreateHistoricalConfirmedSale,
   adminMarkCommissionPaid,
-  adminApproveOrderWithPayment,
   adminUpdateOrderStatus,
   signedImage,
   uploadCommissionReceipt,
@@ -36,12 +35,6 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
     athleteCodeSearch: '',
     orderNumber: '',
     orderDate: today(),
-    productId: '',
-    productName: '',
-    productCategory: '',
-    quantity: 1,
-    unitPrice: '',
-    commissionPrice: '',
     status: 'pending',
   });
   const [busy, setBusy] = useState(false);
@@ -49,6 +42,9 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
   const [athleteOpen, setAthleteOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedProducts, setSelectedProducts] = useState({});
+  const productPickerRef = useRef(null);
   const [qrPopup, setQrPopup] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
   const [qrLoading, setQrLoading] = useState(false);
@@ -91,16 +87,32 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
   }, [affiliates, form.athleteCodeSearch]);
 
   const productSuggestions = useMemo(() => {
-    const q = form.productName.trim();
-    return activeProducts
-      .filter((product) => !q || includesText(`${product.name} ${product.sku || ''} ${product.category || ''}`, q))
-      .slice(0, 8);
-  }, [activeProducts, form.productName]);
+    const q = productSearch.trim();
+    return activeProducts.filter(
+      (product) => !q || includesText(`${product.name} ${product.sku || ''} ${product.category || ''}`, q),
+    );
+  }, [activeProducts, productSearch]);
 
-  const quantity = Math.max(0, Number(form.quantity || 0));
-  const estimatedSale = quantity * Number(form.unitPrice || 0);
-  const estimatedCommission = quantity * Number(form.commissionPrice || 0);
-  const directPaymentEnabled = form.status === 'approved' || form.status === 'confirmed';
+  const selectedProductRows = useMemo(
+    () => activeProducts
+      .filter((product) => Object.prototype.hasOwnProperty.call(selectedProducts, product.id))
+      .map((product) => ({
+        ...product,
+        quantity: Number(selectedProducts[product.id] || 0),
+      })),
+    [activeProducts, selectedProducts],
+  );
+
+  const totalQuantity = selectedProductRows.reduce((sum, product) => sum + Number(product.quantity || 0), 0);
+  const estimatedSale = selectedProductRows.reduce(
+    (sum, product) => sum + (Number(product.quantity || 0) * Number(product.selling_price || 0)),
+    0,
+  );
+  const estimatedCommission = selectedProductRows.reduce(
+    (sum, product) => sum + (Number(product.quantity || 0) * Number(product.commission_price || 0)),
+    0,
+  );
+  const directPaymentEnabled = false;
 
   useEffect(() => {
     let active = true;
@@ -123,6 +135,17 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
     loadQr();
     return () => { active = false; };
   }, [selectedPayout?.qr_code_path]);
+
+  useEffect(() => {
+    function closeProductPicker(event) {
+      if (!productPickerRef.current?.contains(event.target)) {
+        setProductOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeProductPicker);
+    return () => document.removeEventListener('mousedown', closeProductPicker);
+  }, []);
 
   function pickAthlete(athlete) {
     const profile = affiliateProfile(athlete);
@@ -165,16 +188,31 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
     setCodeOpen(true);
   }
 
-  function pickProduct(product) {
-    setForm((current) => ({
+  function toggleProduct(product) {
+    setSelectedProducts((current) => {
+      const next = { ...current };
+      if (Object.prototype.hasOwnProperty.call(next, product.id)) {
+        delete next[product.id];
+      } else {
+        next[product.id] = '1';
+      }
+      return next;
+    });
+  }
+
+  function updateProductQuantity(productId, value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    setSelectedProducts((current) => ({
       ...current,
-      productId: product.id,
-      productName: product.name,
-      productCategory: product.category || 'Uncategorized',
-      unitPrice: Number(product.selling_price || 0),
-      commissionPrice: Number(product.commission_price || 0),
+      [productId]: digits,
     }));
-    setProductOpen(false);
+  }
+
+  function normalizeProductQuantity(productId) {
+    setSelectedProducts((current) => ({
+      ...current,
+      [productId]: String(Math.max(1, Number(current[productId] || 1))),
+    }));
   }
 
   function viewQr() {
@@ -198,28 +236,38 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
     setBusy(true);
     try {
       if (!form.affiliateId) throw new Error('Select an athlete from the suggestions.');
-      if (!form.productId) throw new Error('Select a product from the suggestions.');
+      if (!selectedProductRows.length) throw new Error('Select at least one product.');
+      if (selectedProductRows.some((product) => !Number.isInteger(product.quantity) || product.quantity <= 0)) {
+        throw new Error('Every selected product must have a quantity of at least 1.');
+      }
       if (directPaymentEnabled && !payment.receipt) {
-        throw new Error('Upload a payment receipt image before saving this sale.');
+        throw new Error('Upload a receipt image before saving a confirmed sale.');
       }
 
-      // Normal orders are created as Pending first.
-      // Approved requires payment details, while direct Confirmed is reserved for
-      // importing historical/past commissions.
+      const saleValues = {
+        ...form,
+        items: selectedProductRows.map((product) => ({
+          productId: product.id,
+          quantity: product.quantity,
+        })),
+      };
+
+      // Normal orders start as Pending and use the protected status workflow.
+      // Confirmed is the one intentional exception here: it imports an already-confirmed
+      // historical commission through a dedicated admin-only database function.
       const orderId = form.status === 'confirmed'
-        ? await adminCreateHistoricalConfirmedSale(form)
-        : await adminCreateSale({ ...form, status: 'pending' });
+        ? await adminCreateHistoricalConfirmedSale(saleValues)
+        : await adminCreateSale(saleValues);
 
-      let receiptPath = null;
-      if (directPaymentEnabled && payment.receipt) {
-        receiptPath = await uploadCommissionReceipt(selectedAthlete.user_id, orderId, payment.receipt);
+      if (form.status === 'approved' || form.status === 'cancelled') {
+        await adminUpdateOrderStatus(orderId, form.status);
       }
 
-      if (form.status === 'approved') {
-        await adminApproveOrderWithPayment(orderId, payment, receiptPath);
-      } else if (form.status === 'cancelled') {
-        await adminUpdateOrderStatus(orderId, 'cancelled');
-      } else if (form.status === 'confirmed') {
+      if (directPaymentEnabled) {
+        let receiptPath = null;
+        if (payment.receipt) {
+          receiptPath = await uploadCommissionReceipt(selectedAthlete.user_id, orderId, payment.receipt);
+        }
         await adminMarkCommissionPaid(orderId, payment, receiptPath);
       }
 
@@ -317,60 +365,98 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
                   <input type="date" required value={form.orderDate} onChange={(event) => setForm({ ...form, orderDate: event.target.value })} />
                 </Field>
 
-                <Field label="Product">
-                  <div className="autocomplete">
-                    <Search size={16} className="autocomplete-icon" />
-                    <input
-                      required
-                      value={form.productName}
-                      onFocus={() => setProductOpen(true)}
-                      onChange={(event) => {
-                        setForm({
-                          ...form,
-                          productId: '',
-                          productName: event.target.value,
-                          productCategory: '',
-                          unitPrice: '',
-                          commissionPrice: '',
-                        });
-                        setProductOpen(true);
-                      }}
-                      onBlur={() => setTimeout(() => setProductOpen(false), 150)}
-                      placeholder="Type product name"
-                      autoComplete="off"
-                    />
-                    <ChevronDown size={15} className="autocomplete-chevron" />
+                <div className="field product-picker-field">
+                  <span>Products</span>
+                  <div className="multi-product-picker" ref={productPickerRef}>
+                    <button
+                      type="button"
+                      className={productOpen ? 'multi-product-trigger open' : 'multi-product-trigger'}
+                      onClick={() => setProductOpen((open) => !open)}
+                    >
+                      <div>
+                        <Package size={16} />
+                        <strong>
+                          {selectedProductRows.length
+                            ? `${selectedProductRows.length} product${selectedProductRows.length === 1 ? '' : 's'} selected`
+                            : 'Select products'}
+                        </strong>
+                      </div>
+                      <ChevronDown size={16} />
+                    </button>
+
                     {productOpen && (
-                      <div className="autocomplete-menu product-suggestion-menu">
-                        {productSuggestions.map((product) => (
-                          <button type="button" key={product.id} onMouseDown={() => pickProduct(product)}>
-                            <div className="suggestion-row">
-                              <div>
-                                <strong>{product.name}</strong>
-                                <span>{product.category || 'Uncategorized'}{product.sku ? ` • ${product.sku}` : ''}</span>
+                      <div className="multi-product-menu">
+                        <div className="multi-product-search">
+                          <Search size={15} />
+                          <input
+                            autoFocus
+                            value={productSearch}
+                            onChange={(event) => setProductSearch(event.target.value)}
+                            placeholder="Search product, SKU, or category"
+                            autoComplete="off"
+                          />
+                        </div>
+
+                        <div className="multi-product-options">
+                          {productSuggestions.map((product) => {
+                            const checked = Object.prototype.hasOwnProperty.call(selectedProducts, product.id);
+                            return (
+                              <div
+                                key={product.id}
+                                className={checked ? 'multi-product-option selected' : 'multi-product-option'}
+                              >
+                                <label className="multi-product-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleProduct(product)}
+                                  />
+                                  <span className="multi-product-box"><Check size={12} /></span>
+                                  <div className="multi-product-info">
+                                    <strong>{product.name}</strong>
+                                    <small>
+                                      {product.category || 'Uncategorized'}
+                                      {product.sku ? ` • ${product.sku}` : ''}
+                                    </small>
+                                    <em>
+                                      {peso(product.selling_price)} • {peso(product.commission_price)} commission/item
+                                    </em>
+                                  </div>
+                                </label>
+
+                                {checked && (
+                                  <div className="multi-product-qty">
+                                    <span>Qty</span>
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      min="1"
+                                      step="1"
+                                      value={selectedProducts[product.id]}
+                                      onChange={(event) => updateProductQuantity(product.id, event.target.value)}
+                                      onBlur={() => normalizeProductQuantity(product.id)}
+                                      onClick={(event) => event.stopPropagation()}
+                                      aria-label={`${product.name} quantity`}
+                                    />
+                                  </div>
+                                )}
                               </div>
-                              <div className="suggestion-prices">
-                                <b>{peso(product.selling_price)}</b>
-                                <small>{peso(product.commission_price)} commission</small>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                        {!productSuggestions.length && (
-                          <div className="autocomplete-empty">No matching product. Add it first from Products.</div>
-                        )}
+                            );
+                          })}
+
+                          {!productSuggestions.length && (
+                            <div className="autocomplete-empty">No matching product. Add it first from Products.</div>
+                          )}
+                        </div>
+
+                        <div className="multi-product-footer">
+                          <span>{selectedProductRows.length} selected</span>
+                          <strong>Total quantity: {totalQuantity}</strong>
+                        </div>
                       </div>
                     )}
                   </div>
-                </Field>
-
-                <Field label="Quantity">
-                  <input type="number" min="1" required value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} />
-                </Field>
-
-                <Field label="Category">
-                  <input readOnly value={form.productCategory} placeholder="Auto-filled" />
-                </Field>
+                </div>
 
                 <Field label="Order status">
                   <select
@@ -386,8 +472,8 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
               </div>
 
               <div className="sale-auto-values">
-                <div><span>Product price</span><strong>{peso(form.unitPrice)}</strong></div>
-                <div><span>Commission / item</span><strong>{peso(form.commissionPrice)}</strong></div>
+                <div><span>Products selected</span><strong>{selectedProductRows.length}</strong></div>
+                <div><span>Total quantity</span><strong>{totalQuantity}</strong></div>
                 <div><span>Sale total</span><strong>{peso(estimatedSale)}</strong></div>
                 <div className="commission-total-card"><span>Athlete commission</span><strong>{peso(estimatedCommission)}</strong></div>
               </div>
@@ -396,22 +482,22 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
                 <div className="direct-payment-title-row">
                   <div>
                     <strong>Commission workflow</strong>
-                    <span>Approved shows the payment fields below. Approved sales automatically become Confirmed the next day, while past commissions may still be entered directly as Confirmed.</span>
+                    <span>New sales: Pending → Approved → Confirmed. For past commissions, you may select Confirmed directly when adding the historical sale. Cancelled closes the order.</span>
                   </div>
                   <span className="direct-default-pill">WORKFLOW</span>
                 </div>
 
                 {directPaymentEnabled && (
                   <div className="field-grid three direct-payment-fields">
-                    <Field label="Mode of payment">
+                    <Field label="Payment method">
                       <select value={payment.method} onChange={(event) => setPayment({ ...payment, method: event.target.value })}>
-                        <option>GCash</option><option>Maya</option><option>MariBank</option><option>GoTyme Bank</option><option>BDO</option><option>BPI</option><option>UnionBank</option><option>Metrobank</option><option>Other Bank</option>
+                        <option>GCash</option><option>Maya</option><option>BDO</option><option>BPI</option><option>UnionBank</option><option>Metrobank</option><option>Other Bank</option>
                       </select>
                     </Field>
                     <Field label="Reference number (optional)">
                       <input value={payment.ref} onChange={(event) => setPayment({ ...payment, ref: event.target.value })} placeholder="Payment reference (optional)" />
                     </Field>
-                    <Field label="Payment receipt / QR proof (required)">
+                    <Field label="Receipt image (required)">
                       <label className="file-inline-btn">
                         <ImagePlus size={15} /> {payment.receipt ? payment.receipt.name : 'Choose image'}
                         <input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setPayment({ ...payment, receipt: event.target.files?.[0] || null })} />

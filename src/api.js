@@ -216,7 +216,7 @@ export async function loadAffiliateData(affiliateId) {
   const [{ data: orders, error: ordersError }] = await Promise.all([
     client
       .from('orders')
-      .select('id, external_order_number, order_date, final_sale, status, commission_approved_at, commission_payment_method, commission_reference_number, commission_receipt_path, commission_payment_recorded_at, order_items(product_name_snapshot, product_category_snapshot, commission_per_unit_snapshot, quantity, line_total), commissions(commission_rate, commission_amount, payment_status, payment_method, reference_number, receipt_path, paid_at)')
+      .select('id, external_order_number, order_date, final_sale, status, commission_approved_at, order_items(product_name_snapshot, product_category_snapshot, commission_per_unit_snapshot, quantity, line_total), commissions(commission_rate, commission_amount, payment_status, payment_method, reference_number, receipt_path, paid_at, payout_id)')
       .eq('affiliate_id', affiliateId)
       .order('order_date', { ascending: false }),
   ]);
@@ -228,8 +228,8 @@ export async function loadAdminData() {
   const client = requireSupabase();
   const [affiliatesResult, ordersResult, commissionsResult, productsResult] = await Promise.all([
     client.from('affiliates').select('id,user_id,affiliate_code,commission_rate,status,approved_at,created_at,profiles(full_name,first_name,middle_name,last_name,address,email,mobile_number),payout_accounts(payout_method,account_name,account_number,bank_name,qr_code_path,verified_at)').order('created_at', { ascending: false }),
-    client.from('orders').select('id,external_order_number,affiliate_id,order_date,final_sale,status,commission_approved_at,commission_payment_method,commission_reference_number,commission_receipt_path,commission_payment_recorded_at,order_items(product_name_snapshot,product_category_snapshot,commission_per_unit_snapshot,quantity,line_total),commissions(commission_rate,commission_amount,payment_status,payment_method,reference_number,receipt_path,paid_at)').order('order_date', { ascending: false }).limit(500),
-    client.from('commissions').select('id,affiliate_id,order_id,commission_rate,qualified_sale,commission_amount,payment_status,payment_method,reference_number,receipt_path,paid_at,created_at').limit(1000),
+    client.from('orders').select('id,external_order_number,affiliate_id,order_date,final_sale,status,commission_approved_at,order_items(product_name_snapshot,product_category_snapshot,commission_per_unit_snapshot,quantity,line_total),commissions(commission_rate,commission_amount,payment_status,payment_method,reference_number,receipt_path,paid_at,payout_id)').order('order_date', { ascending: false }).limit(500),
+    client.from('commissions').select('id,affiliate_id,order_id,commission_rate,qualified_sale,commission_amount,payment_status,payment_method,reference_number,receipt_path,paid_at,payout_id,created_at').limit(1000),
     client.from('products').select('id,sku,name,category,selling_price,commission_price,active,created_at,updated_at').order('name'),
   ]);
   for (const result of [affiliatesResult, ordersResult, commissionsResult, productsResult]) {
@@ -259,15 +259,20 @@ export async function adminSendAthleteApprovalEmail(affiliateId) {
   return notifyAthleteApplication('approved', affiliateId);
 }
 
+function saleItemsPayload(items = []) {
+  return items.map((item) => ({
+    product_id: item.productId,
+    quantity: Number(item.quantity),
+  }));
+}
+
 export async function adminCreateSale(values) {
   const client = requireSupabase();
-  const { data, error } = await client.rpc('admin_create_sale', {
+  const { data, error } = await client.rpc('admin_create_sale_multi', {
     p_affiliate_id: values.affiliateId,
     p_external_order_number: values.orderNumber.trim(),
     p_order_date: values.orderDate,
-    p_product_id: values.productId,
-    p_quantity: Number(values.quantity),
-    p_status: values.status,
+    p_items: saleItemsPayload(values.items),
   });
   if (error) throw error;
   return data;
@@ -275,12 +280,11 @@ export async function adminCreateSale(values) {
 
 export async function adminCreateHistoricalConfirmedSale(values) {
   const client = requireSupabase();
-  const { data, error } = await client.rpc('admin_create_historical_confirmed_sale', {
+  const { data, error } = await client.rpc('admin_create_historical_confirmed_sale_multi', {
     p_affiliate_id: values.affiliateId,
     p_external_order_number: values.orderNumber.trim(),
     p_order_date: values.orderDate,
-    p_product_id: values.productId,
-    p_quantity: Number(values.quantity),
+    p_items: saleItemsPayload(values.items),
   });
   if (error) throw error;
   return data;
@@ -340,6 +344,37 @@ export async function adminApproveOrderWithPayment(orderId, values, receiptPath)
     p_payment_method: values.method,
     p_reference_number: values.ref?.trim() || null,
     p_receipt_path: receiptPath,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function uploadBatchPayoutReceipt(athleteUserId, file) {
+  const client = requireSupabase();
+  if (!file) throw new Error('Payment receipt is required.');
+  if (file.size > 8 * 1024 * 1024) throw new Error('Receipt image must be 8 MB or smaller.');
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+    throw new Error('Receipt must be a JPG, PNG, or WEBP image.');
+  }
+  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+  const path = `${athleteUserId}/batch-${Date.now()}-${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await client.storage.from('payout-receipts').upload(path, file, {
+    cacheControl: '3600', upsert: false, contentType: file.type,
+  });
+  if (error) throw error;
+  return path;
+}
+
+export async function adminPaySelectedCommissions(affiliateId, orderIds, values, receiptPath) {
+  const client = requireSupabase();
+  if (!Array.isArray(orderIds) || !orderIds.length) throw new Error('Select at least one commission to pay.');
+  const { data, error } = await client.rpc('admin_pay_selected_commissions', {
+    p_affiliate_id: affiliateId,
+    p_order_ids: orderIds,
+    p_payment_method: values.method,
+    p_reference_number: values.ref?.trim() || null,
+    p_receipt_path: receiptPath,
+    p_admin_note: null,
   });
   if (error) throw error;
   return data;

@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Search, UserRound, X } from 'lucide-react';
+import AthleteCommissionTab from '../../components/admin/AthleteCommissionTab';
 import Modal from '../../components/common/Modal';
 import PageHeader from '../../components/common/PageHeader';
 import { affiliateProfile, orderItems, payoutAccount, peso } from '../../utils/helpers';
 
-export default function AdminAffiliates({ data }) {
+export default function AdminAffiliates({ data, onRefresh }) {
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detailTab, setDetailTab] = useState('profile');
 
   const summaries = useMemo(
     () => data.affiliates.filter((athlete) => athlete.status === 'approved').map((athlete) => {
@@ -38,6 +40,11 @@ export default function AdminAffiliates({ data }) {
     [data],
   );
 
+  const selected = useMemo(
+    () => summaries.find((athlete) => athlete.id === selectedId) || null,
+    [summaries, selectedId],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return summaries;
@@ -55,12 +62,17 @@ export default function AdminAffiliates({ data }) {
     });
   }, [summaries, query]);
 
+  function openDetails(athlete) {
+    setSelectedId(athlete.id);
+    setDetailTab('profile');
+  }
+
   return (
     <>
       <PageHeader
         eyebrow="ATHLETES"
         title="Athlete accounts"
-        subtitle="Search athletes and view their sales, product totals, commissions, and saved payment information."
+        subtitle="Search athletes, view their account information, review commission statuses, and pay selected commissions."
       />
 
       <div className="panel athlete-search-panel">
@@ -105,7 +117,7 @@ export default function AdminAffiliates({ data }) {
                   <td>{peso(athlete.paid)}</td>
                   <td>{athlete.payout?.payout_method || '—'}</td>
                   <td className="mono">{athlete.payout?.account_number || '—'}</td>
-                  <td><button className="secondary-btn tiny" onClick={() => setSelected(athlete)}>View details</button></td>
+                  <td><button className="secondary-btn tiny" onClick={() => openDetails(athlete)}>View details</button></td>
                 </tr>
               ))}
             </tbody>
@@ -115,14 +127,14 @@ export default function AdminAffiliates({ data }) {
       </div>
 
       {selected && (
-        <Modal onClose={() => setSelected(null)} className="athlete-details-modal">
+        <Modal onClose={() => setSelectedId(null)} className="athlete-details-modal athlete-account-modal">
           <div className="modal-head">
             <div>
-              <span className="eyebrow">ATHLETE DETAILS</span>
+              <span className="eyebrow">ATHLETE ACCOUNT</span>
               <h2>{selected.profile.full_name || 'Athlete'}</h2>
               <p>{selected.profile.email || ''}</p>
             </div>
-            <button type="button" className="icon-btn" onClick={() => setSelected(null)}><X size={18} /></button>
+            <button type="button" className="icon-btn" onClick={() => setSelectedId(null)}><X size={18} /></button>
           </div>
 
           <div className="athlete-detail-hero">
@@ -133,19 +145,40 @@ export default function AdminAffiliates({ data }) {
             </div>
           </div>
 
-          <div className="detail-grid athlete-detail-grid">
-            <div><span>Email</span><strong>{selected.profile.email || '—'}</strong></div>
-            <div><span>Mobile number</span><strong>{selected.profile.mobile_number || '—'}</strong></div>
-            <div><span>Athlete code</span><strong className="mono">{selected.affiliate_code || '—'}</strong></div>
-            <div><span>Sales</span><strong>{peso(selected.sales)}</strong></div>
-            <div><span>Products sold</span><strong>{selected.products}</strong></div>
-            <div><span>Commission</span><strong>{peso(selected.commission)}</strong></div>
-            <div><span>Paid</span><strong>{peso(selected.paid)}</strong></div>
-            <div><span>Payment method</span><strong>{selected.payout?.payout_method || '—'}</strong></div>
-            <div><span>Account name</span><strong>{selected.payout?.account_name || '—'}</strong></div>
-            <div><span>GCash / Account no.</span><strong className="mono">{selected.payout?.account_number || '—'}</strong></div>
-            <div className="athlete-detail-wide"><span>Bank</span><strong>{selected.payout?.bank_name || '—'}</strong></div>
+          <div className="athlete-account-tabs" role="tablist" aria-label="Athlete account sections">
+            <button
+              type="button"
+              className={detailTab === 'profile' ? 'active' : ''}
+              onClick={() => setDetailTab('profile')}
+            >
+              Account info
+            </button>
+            <button
+              type="button"
+              className={detailTab === 'commissions' ? 'active' : ''}
+              onClick={() => setDetailTab('commissions')}
+            >
+              Commission / Sales Status
+            </button>
           </div>
+
+          {detailTab === 'profile' ? (
+            <div className="detail-grid athlete-detail-grid">
+              <div><span>Email</span><strong>{selected.profile.email || '—'}</strong></div>
+              <div><span>Mobile number</span><strong>{selected.profile.mobile_number || '—'}</strong></div>
+              <div><span>Athlete code</span><strong className="mono">{selected.affiliate_code || '—'}</strong></div>
+              <div><span>Sales</span><strong>{peso(selected.sales)}</strong></div>
+              <div><span>Products sold</span><strong>{selected.products}</strong></div>
+              <div><span>Commission</span><strong>{peso(selected.commission)}</strong></div>
+              <div><span>Paid</span><strong>{peso(selected.paid)}</strong></div>
+              <div><span>Payment method</span><strong>{selected.payout?.payout_method || '—'}</strong></div>
+              <div><span>Account name</span><strong>{selected.payout?.account_name || '—'}</strong></div>
+              <div><span>GCash / Account no.</span><strong className="mono">{selected.payout?.account_number || '—'}</strong></div>
+              <div className="athlete-detail-wide"><span>Bank</span><strong>{selected.payout?.bank_name || '—'}</strong></div>
+            </div>
+          ) : (
+            <AthleteCommissionTab athlete={selected} data={data} onRefresh={onRefresh} />
+          )}
         </Modal>
       )}
     </>
