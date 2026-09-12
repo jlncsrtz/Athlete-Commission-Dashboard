@@ -1,13 +1,42 @@
-import React, { useMemo } from 'react';
-import { BadgeCheck, BadgeDollarSign, CheckCircle2, Clock3, Package, Plus, ShoppingBag, Trophy, Users } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { BadgeCheck, BadgeDollarSign, CalendarDays, CheckCircle2, Clock3, Package, Plus, ShoppingBag, Trophy, Users } from 'lucide-react';
 import PageHeader from '../../components/common/PageHeader';
 import StatCard from '../../components/common/StatCard';
 import { affiliateProfile, estimatedCommissionFromOrder, orderItems, peso } from '../../utils/helpers';
 
+function localIso(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function presetRange(mode) {
+  const now = new Date();
+  const end = localIso(now);
+  if (mode === 'today') return { from: end, to: end };
+  if (mode === '7d') { const d = new Date(now); d.setDate(d.getDate() - 6); return { from: localIso(d), to: end }; }
+  if (mode === '30d') { const d = new Date(now); d.setDate(d.getDate() - 29); return { from: localIso(d), to: end }; }
+  if (mode === 'month') return { from: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, to: end };
+  return { from: '', to: '' };
+}
+
 export default function AdminOverview({ data, onAddSale }) {
-  const pending = data.orders.filter((order) => order.status === 'pending');
-  const approved = data.orders.filter((order) => order.status === 'approved');
-  const confirmed = data.orders.filter((order) => order.status === 'confirmed');
+  const [dateMode, setDateMode] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const filteredOrders = useMemo(() => (data.orders || []).filter((order) => {
+    const saleDate = String(order.order_date || '').slice(0, 10);
+    if (!saleDate) return false;
+    if (dateFrom && saleDate < dateFrom) return false;
+    if (dateTo && saleDate > dateTo) return false;
+    return true;
+  }), [data.orders, dateFrom, dateTo]);
+
+  const filteredOrderIds = useMemo(() => new Set(filteredOrders.map((order) => order.id)), [filteredOrders]);
+  const filteredCommissions = useMemo(() => (data.commissions || []).filter((item) => filteredOrderIds.has(item.order_id)), [data.commissions, filteredOrderIds]);
+
+  const pending = filteredOrders.filter((order) => order.status === 'pending');
+  const approved = filteredOrders.filter((order) => order.status === 'approved');
+  const confirmed = filteredOrders.filter((order) => order.status === 'confirmed');
 
   const pendingCommission = pending.reduce(
     (sum, order) => sum + estimatedCommissionFromOrder(order),
@@ -23,7 +52,7 @@ export default function AdminOverview({ data, onAddSale }) {
   );
 
   const totalSales = confirmed.reduce((sum, order) => sum + Number(order.final_sale || 0), 0);
-  const totalCommission = data.commissions.reduce(
+  const totalCommission = filteredCommissions.reduce(
     (sum, item) => sum + Number(item.commission_amount || 0),
     0,
   );
@@ -35,7 +64,7 @@ export default function AdminOverview({ data, onAddSale }) {
 
   const athleteLeaderboard = useMemo(() => data.affiliates.filter((athlete) => athlete.status === 'approved').map((athlete) => {
     const athleteOrders = confirmed.filter((order) => order.affiliate_id === athlete.id);
-    const athleteCommissions = data.commissions.filter((item) => item.affiliate_id === athlete.id);
+    const athleteCommissions = filteredCommissions.filter((item) => item.affiliate_id === athlete.id);
     const commission = athleteCommissions.reduce((sum, item) => sum + Number(item.commission_amount || 0), 0);
     const paid = athleteCommissions
       .filter((item) => item.payment_status === 'paid')
@@ -46,7 +75,7 @@ export default function AdminOverview({ data, onAddSale }) {
       0,
     );
     return { athlete, commission, paid, sales, products };
-  }).sort((a, b) => b.commission - a.commission), [data, confirmed]);
+  }).sort((a, b) => b.commission - a.commission), [data.affiliates, confirmed, filteredCommissions]);
 
   const topProducts = useMemo(() => {
     const productMap = new Map();
@@ -72,6 +101,42 @@ export default function AdminOverview({ data, onAddSale }) {
         subtitle="See your highest-performing athletes, direct commissions, and products driving the most commission."
         action={<button className="primary-btn" onClick={onAddSale}><Plus size={17} /> Add athlete sale</button>}
       />
+
+      <div className="dashboard-date-filter">
+        <div className="dashboard-date-heading">
+          <CalendarDays size={15} />
+          <span className="dashboard-date-label">Sales date</span>
+        </div>
+        <div className="dashboard-date-controls">
+          <select
+            className="dashboard-date-select"
+            aria-label="Sales date range"
+            value={dateMode}
+            onChange={(event) => {
+              const mode = event.target.value;
+              setDateMode(mode);
+              if (mode !== 'custom') {
+                const range = presetRange(mode);
+                setDateFrom(range.from);
+                setDateTo(range.to);
+              }
+            }}
+          >
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="month">This month</option>
+            <option value="custom">Custom</option>
+          </select>
+          {dateMode === 'custom' && (
+            <>
+              <label className="dashboard-date-inline"><span>From</span><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
+              <label className="dashboard-date-inline"><span>To</span><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
+            </>
+          )}
+        </div>
+      </div>
 
       <div className="stats-grid">
         <StatCard icon={ShoppingBag} label="Confirmed athlete sales" value={peso(totalSales)} accent />

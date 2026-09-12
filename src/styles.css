@@ -506,3 +506,141 @@ html,body,#root{max-width:100%;overflow-x:hidden}.mobile-logout-btn{display:none
   .payment-success-actions{flex-direction:column}
   .payment-success-actions button{width:100%;justify-content:center}
 }
+
+/* V19: Theme-matched minimalist dashboard sales-date filter */
+.dashboard-date-filter{
+  width:max-content;
+  max-width:100%;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin:0 0 18px;
+  padding:5px;
+  border:1px solid #252827;
+  border-radius:12px;
+  background:linear-gradient(145deg,#0f1110,#090a0a);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 8px 24px rgba(0,0,0,.12);
+}
+.dashboard-date-heading{
+  height:34px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:0 9px 0 8px;
+  border-right:1px solid #202321;
+  color:var(--accent);
+  flex:0 0 auto;
+}
+.dashboard-date-label{
+  font-size:9px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:#8b918f;
+  white-space:nowrap;
+}
+.dashboard-date-controls{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex-wrap:wrap;
+}
+.dashboard-date-select,
+.dashboard-date-controls input{
+  width:auto;
+  height:34px;
+  min-height:34px;
+  border:1px solid transparent;
+  border-radius:8px;
+  background-color:#0a0b0b;
+  color:#e6e9e6;
+  padding:5px 31px 5px 10px;
+  font-size:11px;
+  font-weight:700;
+  box-shadow:none;
+}
+.dashboard-date-select{
+  min-width:124px;
+  background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px;
+}
+.dashboard-date-select:hover,
+.dashboard-date-controls input:hover{
+  border-color:#343a31;
+  background-color:#0d0f0d;
+}
+.dashboard-date-select:focus,
+.dashboard-date-controls input:focus{
+  border-color:#667a2b;
+  box-shadow:0 0 0 3px rgba(200,255,46,.055);
+}
+.dashboard-date-inline{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  padding-left:5px;
+  color:#6f7672;
+  font-size:9px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  white-space:nowrap;
+}
+.dashboard-date-inline input{
+  width:132px;
+  padding-right:8px;
+  color-scheme:dark;
+}
+.athlete-date-filter{
+  border-color:#2b3028;
+}
+@media (max-width:760px){
+  .dashboard-date-filter{
+    width:100%;
+    align-items:stretch;
+    gap:5px;
+    padding:6px;
+    margin-bottom:14px;
+  }
+  .dashboard-date-heading{
+    height:38px;
+    padding:0 9px;
+  }
+  .dashboard-date-controls{
+    flex:1;
+    min-width:0;
+  }
+  .dashboard-date-select{
+    flex:1;
+    width:100%;
+    min-width:0;
+    height:38px;
+    min-height:38px;
+    font-size:13px;
+    background-position:calc(100% - 16px) 16px,calc(100% - 11px) 16px;
+  }
+  .dashboard-date-inline{
+    flex:1 1 145px;
+    padding:2px 0 0;
+  }
+  .dashboard-date-inline input{
+    flex:1;
+    width:100%;
+    min-width:0;
+    height:40px;
+    min-height:40px;
+    font-size:13px;
+  }
+}
+@media (max-width:480px){
+  .dashboard-date-filter{flex-wrap:wrap}
+  .dashboard-date-heading{
+    width:100%;
+    height:28px;
+    border-right:0;
+    border-bottom:1px solid #202321;
+    padding:0 6px 5px;
+  }
+  .dashboard-date-controls{width:100%}
+}
+

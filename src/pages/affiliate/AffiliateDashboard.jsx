@@ -1,11 +1,36 @@
-import React from 'react';
-import { BadgeCheck, BarChart3, CheckCircle2, Clock3, Copy, Package } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { BadgeCheck, BarChart3, CalendarDays, CheckCircle2, Clock3, Copy, Package } from 'lucide-react';
 import StatCard from '../../components/common/StatCard';
 import SalesTable from '../../components/sales/SalesTable';
 import { orderItems, peso, salesFromOrders } from '../../utils/helpers';
 
+function localIso(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function presetRange(mode) {
+  const now = new Date();
+  const end = localIso(now);
+  if (mode === 'today') return { from: end, to: end };
+  if (mode === '7d') { const d = new Date(now); d.setDate(d.getDate() - 6); return { from: localIso(d), to: end }; }
+  if (mode === '30d') { const d = new Date(now); d.setDate(d.getDate() - 29); return { from: localIso(d), to: end }; }
+  if (mode === 'month') return { from: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, to: end };
+  return { from: '', to: '' };
+}
+
 export default function AffiliateDashboard({ account, data }) {
-  const sales = salesFromOrders(data.orders);
+  const [dateMode, setDateMode] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const allSales = useMemo(() => salesFromOrders(data.orders), [data.orders]);
+  const sales = useMemo(() => allSales.filter((sale) => {
+    const saleDate = String(sale.date || '').slice(0, 10);
+    if (!saleDate) return false;
+    if (dateFrom && saleDate < dateFrom) return false;
+    if (dateTo && saleDate > dateTo) return false;
+    return true;
+  }), [allSales, dateFrom, dateTo]);
   const confirmed = sales.filter((sale) => sale.status === 'confirmed');
   const activeSales = sales.filter((sale) => !['cancelled', 'refunded'].includes(sale.status));
   const totalGmv = activeSales.reduce((sum, sale) => sum + sale.sale, 0);
@@ -35,6 +60,42 @@ export default function AffiliateDashboard({ account, data }) {
           <span>Your athlete's code</span>
           <strong>{account.affiliate.affiliate_code}</strong>
           <button className="icon-btn" onClick={() => navigator.clipboard?.writeText(account.affiliate.affiliate_code)}><Copy size={17} /></button>
+        </div>
+      </div>
+
+      <div className="dashboard-date-filter athlete-date-filter">
+        <div className="dashboard-date-heading">
+          <CalendarDays size={15} />
+          <span className="dashboard-date-label">Sales date</span>
+        </div>
+        <div className="dashboard-date-controls">
+          <select
+            className="dashboard-date-select"
+            aria-label="Sales date range"
+            value={dateMode}
+            onChange={(event) => {
+              const mode = event.target.value;
+              setDateMode(mode);
+              if (mode !== 'custom') {
+                const range = presetRange(mode);
+                setDateFrom(range.from);
+                setDateTo(range.to);
+              }
+            }}
+          >
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="month">This month</option>
+            <option value="custom">Custom</option>
+          </select>
+          {dateMode === 'custom' && (
+            <>
+              <label className="dashboard-date-inline"><span>From</span><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} /></label>
+              <label className="dashboard-date-inline"><span>To</span><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} /></label>
+            </>
+          )}
         </div>
       </div>
 
