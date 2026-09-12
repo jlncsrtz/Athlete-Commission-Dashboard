@@ -13,13 +13,15 @@ import {
 } from 'lucide-react';
 import {
   adminCreateSale,
+  adminCreateHistoricalConfirmedSale,
   adminMarkCommissionPaid,
+  adminUpdateOrderStatus,
   signedImage,
   uploadCommissionReceipt,
 } from '../../api';
 import Field from '../common/Field';
 import Modal from '../common/Modal';
-import Notice from '../common/Notice';
+import FormAlertModal from '../common/FormAlertModal';
 import { affiliateProfile, payoutAccount, peso, today } from '../../utils/helpers';
 
 function includesText(value, query) {
@@ -39,10 +41,10 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
     quantity: 1,
     unitPrice: '',
     commissionPrice: '',
-    status: 'confirmed',
+    status: 'pending',
   });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [formAlert, setFormAlert] = useState({ open: false, title: '', errors: [] });
   const [athleteOpen, setAthleteOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
@@ -97,7 +99,7 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
   const quantity = Math.max(0, Number(form.quantity || 0));
   const estimatedSale = quantity * Number(form.unitPrice || 0);
   const estimatedCommission = quantity * Number(form.commissionPrice || 0);
-  const directPaymentEnabled = form.status === 'confirmed';
+  const directPaymentEnabled = false;
 
   useEffect(() => {
     let active = true;
@@ -186,17 +188,29 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
     setTimeout(() => setCopied(false), 1500);
   }
 
+  function handleNewSaleStatusChange(value) {
+    setForm((current) => ({ ...current, status: value }));
+  }
+
   async function submit(event) {
     event.preventDefault();
     setBusy(true);
-    setError('');
     try {
       if (!form.affiliateId) throw new Error('Select an athlete from the suggestions.');
       if (!form.productId) throw new Error('Select a product from the suggestions.');
       if (directPaymentEnabled && !payment.receipt) {
         throw new Error('Upload a receipt image before saving a confirmed sale.');
       }
-      const orderId = await adminCreateSale(form);
+      // Normal orders start as Pending and use the protected status workflow.
+      // Confirmed is the one intentional exception here: it imports an already-confirmed
+      // historical commission through a dedicated admin-only database function.
+      const orderId = form.status === 'confirmed'
+        ? await adminCreateHistoricalConfirmedSale(form)
+        : await adminCreateSale({ ...form, status: 'pending' });
+
+      if (form.status === 'approved' || form.status === 'cancelled') {
+        await adminUpdateOrderStatus(orderId, form.status);
+      }
 
       if (directPaymentEnabled) {
         let receiptPath = null;
@@ -209,7 +223,7 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
       onClose();
       await onSaved();
     } catch (err) {
-      setError(err.message);
+      setFormAlert({ open: true, title: 'Unable to save athlete sale', errors: [err?.message || 'Please check the sale information and try again.'] });
     } finally {
       setBusy(false);
     }
@@ -223,12 +237,11 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
             <div>
               <span className="eyebrow">MANUAL ENSTACK ENTRY</span>
               <h2>Add athlete sale</h2>
-              <p>Search by athlete name or code. Confirmed commissions are recorded as paid directly by default.</p>
+              <p>Search by athlete name or code, then choose the order status: Pending, Approved, Confirmed, or Cancelled.</p>
             </div>
             <button type="button" className="icon-btn" onClick={onClose}><X size={18} /></button>
           </div>
 
-          {error && <Notice type="error">{error}</Notice>}
 
           <div className="add-sale-layout compact-payment-layout">
             <div className="add-sale-main">
@@ -359,10 +372,11 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
                 <Field label="Order status">
                   <select
                     value={form.status}
-                    onChange={(event) => setForm({ ...form, status: event.target.value })}
+                    onChange={(event) => handleNewSaleStatusChange(event.target.value)}
                   >
-                    <option value="confirmed">Confirmed</option>
                     <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="confirmed">Confirmed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
                 </Field>
@@ -378,10 +392,10 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
               <div className={directPaymentEnabled ? 'direct-payment-box direct-payment-default' : 'direct-payment-box direct-payment-disabled'}>
                 <div className="direct-payment-title-row">
                   <div>
-                    <strong>Direct commission payment</strong>
-                    <span>{directPaymentEnabled ? 'This confirmed commission will be saved as paid automatically.' : 'Pending or cancelled sales do not create a payable commission.'}</span>
+                    <strong>Commission workflow</strong>
+                    <span>New sales: Pending → Approved → Confirmed. For past commissions, you may select Confirmed directly when adding the historical sale. Cancelled closes the order.</span>
                   </div>
-                  <span className="direct-default-pill">DEFAULT</span>
+                  <span className="direct-default-pill">WORKFLOW</span>
                 </div>
 
                 {directPaymentEnabled && (
@@ -479,6 +493,13 @@ export default function AddSaleModal({ affiliates, products = [], onClose, onSav
           </div>
         </Modal>
       )}
+
+      <FormAlertModal
+        open={formAlert.open}
+        title={formAlert.title || 'Please check the sale'}
+        errors={formAlert.errors}
+        onClose={() => setFormAlert({ open: false, title: '', errors: [] })}
+      />
     </>
   );
 }

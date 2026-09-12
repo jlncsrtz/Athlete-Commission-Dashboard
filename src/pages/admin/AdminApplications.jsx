@@ -33,7 +33,7 @@ export default function AdminApplications({ data, onRefresh }) {
         profile: affiliateProfile(athlete),
         payout: payoutAccount(athlete),
       }))
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   }, [data.affiliates]);
 
   const filtered = useMemo(() => {

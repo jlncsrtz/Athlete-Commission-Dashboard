@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { CreditCard, Download, Eye, Image, RefreshCw, Search, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BadgeCheck, CircleDollarSign, Clock3, CreditCard, Download, Eye, Image, RefreshCw, Search, X } from 'lucide-react';
 import { signedImage } from '../../api';
 import Modal from '../../components/common/Modal';
 import PageHeader from '../../components/common/PageHeader';
+import StatCard from '../../components/common/StatCard';
 import StatusPill from '../../components/common/StatusPill';
 import SalesTable from '../../components/sales/SalesTable';
 import { dateLabel, exportSales, peso, salesFromOrders, titleStatus } from '../../utils/helpers';
@@ -20,6 +21,13 @@ function timestampLabel(value) {
   }).format(date);
 }
 
+function commissionLabel(status) {
+  if (status === 'pending') return 'Pending commission';
+  if (status === 'approved') return 'Approved commission';
+  if (status === 'confirmed') return 'Confirmed commission';
+  return 'Commission';
+}
+
 export default function AffiliateSales({ orders }) {
   const sales = salesFromOrders(orders);
   const [query, setQuery] = useState('');
@@ -28,6 +36,13 @@ export default function AffiliateSales({ orders }) {
   const [receiptUrl, setReceiptUrl] = useState('');
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
+
+  const commissionSummary = useMemo(() => sales.reduce((summary, sale) => {
+    if (sale.status === 'pending') summary.pending += Number(sale.commission || 0);
+    if (sale.status === 'approved') summary.approved += Number(sale.commission || 0);
+    if (sale.status === 'confirmed') summary.confirmed += Number(sale.commission || 0);
+    return summary;
+  }, { pending: 0, approved: 0, confirmed: 0 }), [sales]);
 
   const filtered = sales.filter(
     (sale) =>
@@ -63,8 +78,15 @@ export default function AffiliateSales({ orders }) {
       <PageHeader
         eyebrow="SALES"
         title="Your attributed orders"
-        subtitle="Every order connected to your athlete account appears here."
+        subtitle="Order status moves through Pending → Approved → Confirmed. Cancelled orders are excluded."
       />
+
+      <div className="stats-grid three commission-stage-stats">
+        <StatCard icon={Clock3} label="Pending" value={peso(commissionSummary.pending)} detail="Potential commission awaiting admin approval" />
+        <StatCard icon={BadgeCheck} label="Approved" value={peso(commissionSummary.approved)} detail="Approved commission waiting for confirmation" />
+        <StatCard icon={CircleDollarSign} label="Confirmed" value={peso(commissionSummary.confirmed)} detail="Confirmed commission" accent />
+      </div>
+
       <div className="toolbar panel">
         <div className="search">
           <Search size={17} />
@@ -76,8 +98,9 @@ export default function AffiliateSales({ orders }) {
         </div>
         <select value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="all">All</option>
-          <option value="confirmed">Confirmed</option>
           <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="confirmed">Confirmed</option>
           <option value="cancelled">Cancelled</option>
         </select>
         <button className="secondary-btn" onClick={() => exportSales(filtered)}>
@@ -94,7 +117,7 @@ export default function AffiliateSales({ orders }) {
             <div>
               <span className="eyebrow">SALE DETAILS</span>
               <h2>Order #{selectedSale.id}</h2>
-              <p>Complete sale and direct commission payment information.</p>
+              <p>Complete sale and commission information.</p>
             </div>
             <button type="button" className="icon-btn" onClick={() => { setReceiptOpen(false); setSelectedSale(null); }}>
               <X size={18} />
@@ -123,17 +146,27 @@ export default function AffiliateSales({ orders }) {
               <div><span>Category</span><strong>{selectedSale.category || 'Uncategorized'}</strong></div>
               <div><span>Quantity</span><strong>{selectedSale.qty}</strong></div>
               <div><span>Total sale</span><strong>{peso(selectedSale.sale)}</strong></div>
-              <div><span>Commission earned</span><strong className="sale-detail-accent">{peso(selectedSale.commission)}</strong></div>
+              <div><span>{commissionLabel(selectedSale.status)}</span><strong className="sale-detail-accent">{peso(selectedSale.commission)}</strong></div>
             </div>
           </div>
+
+          {selectedSale.status === 'approved' && (
+            <div className="pending-approval-banner commission-stage-note">
+              <Clock3 size={18} />
+              <div>
+                <strong>Approved commission</strong>
+                <span>This can move to Confirmed starting the next calendar day after admin approval.</span>
+              </div>
+            </div>
+          )}
 
           <div className="sale-detail-section">
             <div className="sale-detail-section-title">
               <CreditCard size={16} />
-              <strong>Commission payment details</strong>
+              <strong>Commission status details</strong>
             </div>
             <div className="sale-detail-grid">
-              <div><span>Payment status</span><strong>{titleStatus(selectedSale.paymentStatus || 'unpaid')}</strong></div>
+              <div><span>Commission status</span><strong>{titleStatus(selectedSale.status)}</strong></div>
               <div><span>Payment method</span><strong>{selectedSale.paymentMethod || '—'}</strong></div>
               <div className="sale-detail-wide"><span>Reference number</span><strong className="mono sale-reference-value">{selectedSale.paymentReference || '—'}</strong></div>
               <div className="sale-detail-wide"><span>Payment recorded</span><strong>{timestampLabel(selectedSale.paidAt)}</strong></div>

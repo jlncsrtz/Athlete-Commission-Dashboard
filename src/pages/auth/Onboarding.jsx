@@ -195,6 +195,8 @@ export default function Onboarding({ account, onComplete }) {
               >
                 <option>GCash</option>
                 <option>Maya</option>
+                <option>MariBank</option>
+                <option>GoTyme Bank</option>
                 <option>BDO</option>
                 <option>BPI</option>
                 <option>UnionBank</option>

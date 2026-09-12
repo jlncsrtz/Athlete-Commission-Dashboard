@@ -292,3 +292,65 @@ html,body,#root{max-width:100%;overflow-x:hidden}.mobile-logout-btn{display:none
 .form-section-caption{margin:4px 0 14px;padding:12px 14px;border:1px solid #20251c;background:#0a0c0a;border-radius:12px}.form-section-caption strong,.form-section-caption span{display:block}.form-section-caption strong{font-size:12px;color:#e9ece8}.form-section-caption span{font-size:10px;line-height:1.55;color:#737a75;margin-top:4px}.payout-section-caption{margin-top:20px}.upload-success-label{color:var(--accent)!important;font-weight:700}.password-checklist{margin:-2px 0 14px;padding:11px 12px;border:1px solid #232725;background:#080a09;border-radius:11px}.password-checklist>strong{display:block;font-size:10px;color:#9ba19d;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em}.password-check-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}.password-check-grid span{display:flex;align-items:center;gap:6px;color:#7c827e;font-size:10px;line-height:1.35}.password-check-grid span svg{color:#8d4542;flex:none}.password-check-grid span.passed{color:#b7c1b9}.password-check-grid span.passed svg{color:var(--accent)}.form-alert-modal{width:min(560px,94vw)}.form-alert-head{gap:14px}.form-alert-title{display:flex;align-items:flex-start;gap:12px;min-width:0}.form-alert-icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:#21100f;border:1px solid #5b2b29;color:#ff9f99;flex:none}.form-alert-modal .modal-head h2{font-size:25px;line-height:1.1}.form-alert-list{display:flex;flex-direction:column;gap:8px;margin:0 0 16px}.form-alert-item{display:grid;grid-template-columns:26px 1fr;gap:9px;align-items:start;border:1px solid #3c2321;background:#160d0c;border-radius:11px;padding:10px 11px}.form-alert-item>span{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;background:#2a1513;color:#ffaaa4;font-size:9px;font-weight:900}.form-alert-item p{font-size:11px;line-height:1.5;color:#f1c2be;padding-top:2px}.field input[inputmode="numeric"]{font-variant-numeric:tabular-nums;letter-spacing:.02em}
 @media(max-width:760px){.password-check-grid{grid-template-columns:1fr}.form-alert-modal{width:100%!important}.form-alert-modal .modal-head h2{font-size:22px}.form-section-caption{padding:11px 12px}}
 .password-checklist>small{display:block;color:#656c67;font-size:9px;line-height:1.45;margin-top:8px}
+
+/* Commission approval workflow */
+.commission-stage-stats{margin-bottom:18px}
+.commission-stage-stats .stat-card:nth-child(1) .stat-icon{color:#f5d575}
+.commission-stage-stats .stat-card:nth-child(2) .stat-icon{color:#7cb8ff}
+.commission-stage-stats .stat-card:nth-child(3) .stat-icon{color:var(--accent)}
+.commission-workflow-actions{display:flex;align-items:center;gap:6px;min-width:210px}
+.commission-workflow-actions button:disabled{opacity:.45;cursor:not-allowed}
+.commission-earned-label{font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.07em}
+.muted-step{color:var(--muted);font-size:10px;font-weight:700}
+.commission-stage-note{margin:0 0 14px}
+@media(max-width:760px){.commission-workflow-actions{min-width:190px}.commission-stage-stats{grid-template-columns:1fr!important}}
+
+/* V15: order status workflow + athlete dashboard summary */
+.order-status-control{display:flex;flex-direction:column;gap:5px;min-width:150px}
+.order-status-control small{color:var(--muted);font-size:9px;line-height:1.35;white-space:normal;max-width:180px}
+.order-status-select{min-width:145px}
+.athlete-dashboard-stats .stat-card:nth-child(4) .stat-icon{color:#b9c3ff}
+@media(max-width:760px){
+  .athlete-dashboard-stats{grid-template-columns:1fr 1fr!important}
+  .athlete-dashboard-stats .stat-card{min-height:112px;padding:14px;gap:10px}
+  .athlete-dashboard-stats .stat-copy strong{font-size:20px}
+}
+@media(max-width:430px){
+  .athlete-dashboard-stats{grid-template-columns:1fr!important}
+}
+
+
+/* V12: Add Sale mobile scrolling + historical Confirmed entries */
+@media(max-width:760px){
+  .modal-backdrop{
+    overflow-y:auto!important;
+    overscroll-behavior:contain;
+    touch-action:pan-y;
+  }
+  .add-sale-modal{
+    height:94dvh!important;
+    max-height:94dvh!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-y:contain;
+    touch-action:pan-y;
+    padding-bottom:calc(28px + env(safe-area-inset-bottom))!important;
+  }
+  .add-sale-modal .modal-form{
+    display:block;
+    min-height:max-content;
+    overflow:visible!important;
+    padding-bottom:calc(18px + env(safe-area-inset-bottom));
+  }
+}
+
+
+/* V13: verified Add Sale scrolling on desktop + mobile */
+.add-sale-modal{
+  max-height:94dvh!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}

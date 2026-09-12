@@ -1,9 +1,20 @@
 import React from 'react';
 import { Eye } from 'lucide-react';
 import StatusPill from '../common/StatusPill';
-import { dateLabel, peso } from '../../utils/helpers';
+import { canConfirmApprovedSale, dateLabel, peso } from '../../utils/helpers';
 
-export default function SalesTable({ sales, admin = false, onStatus, onView }) {
+function optionDisabled(sale, option) {
+  const current = sale.status;
+  if (current === option) return false;
+  if (current === 'pending') return !['approved', 'cancelled'].includes(option);
+  if (current === 'approved') {
+    if (option === 'confirmed') return !canConfirmApprovedSale(sale);
+    return option !== 'cancelled';
+  }
+  return true;
+}
+
+export default function SalesTable({ sales, admin = false, onStatus = null, onView = null }) {
   return (
     <div className="table-wrap">
       <table>
@@ -31,15 +42,16 @@ export default function SalesTable({ sales, admin = false, onStatus, onView }) {
               <td>{peso(sale.sale)}</td>
               <td className="strong-cell">{peso(sale.commission)}</td>
               <td>
-                {admin && sale.status !== 'refunded' ? (
+                {admin ? (
                   <select
                     className="status-select"
                     value={sale.status}
                     onChange={(event) => onStatus?.(sale.raw.id, event.target.value)}
                   >
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="pending" disabled={optionDisabled(sale, 'pending')}>Pending</option>
+                    <option value="approved" disabled={optionDisabled(sale, 'approved')}>Approved</option>
+                    <option value="confirmed" disabled={optionDisabled(sale, 'confirmed')}>Confirmed</option>
+                    <option value="cancelled" disabled={optionDisabled(sale, 'cancelled')}>Cancelled</option>
                   </select>
                 ) : (
                   <StatusPill status={sale.status} />

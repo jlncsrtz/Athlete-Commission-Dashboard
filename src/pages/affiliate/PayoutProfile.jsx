@@ -228,7 +228,7 @@ export default function PayoutProfile({ account, onSaved }) {
                   setForm({ ...form, payoutMethod, bankName: isEwallet(payoutMethod) ? '' : form.bankName });
                 }}
               >
-                <option>GCash</option><option>Maya</option><option>BDO</option><option>BPI</option><option>UnionBank</option><option>Metrobank</option><option>Other Bank</option>
+                <option>GCash</option><option>Maya</option><option>MariBank</option><option>GoTyme Bank</option><option>BDO</option><option>BPI</option><option>UnionBank</option><option>Metrobank</option><option>Other Bank</option>
               </select>
             </Field>
             <Field label="Account name">
