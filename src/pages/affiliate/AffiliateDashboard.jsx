@@ -41,7 +41,7 @@ export default function AffiliateDashboard({ account, data }) {
       <div className="stats-grid commission-stage-stats athlete-dashboard-stats">
         <StatCard icon={Clock3} label="Pending" value={peso(pendingCommission)} detail="Commission waiting for admin approval" />
         <StatCard icon={BadgeCheck} label="Approved" value={peso(approvedCommission)} detail="Approved and waiting for confirmation" />
-        <StatCard icon={CheckCircle2} label="Confirmed" value={peso(confirmedCommission)} detail="Confirmed commission earned" />
+        <StatCard icon={CheckCircle2} label="Overall Commission" value={peso(confirmedCommission)} detail="Overall commission earned" />
         <StatCard
           icon={Package}
           label="Total GMV"
