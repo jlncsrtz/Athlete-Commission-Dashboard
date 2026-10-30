@@ -1,0 +1,46 @@
+
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: "0 0,8,16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Supabase database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Missing Supabase secrets"
+            exit 1
+          fi
+
+          STATUS=$(curl --silent --show-error \
+            --output /tmp/supabase-response.json \
+            --write-out "%{http_code}" \
+            --max-time 30 \
+            -X POST \
+            "$SUPABASE_URL/rest/v1/rpc/peakathlete_health_check" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            --data '{}')
+
+          if [ "$STATUS" != "200" ]; then
+            echo "Database check failed. HTTP $STATUS"
+            cat /tmp/supabase-response.json
+            exit 1
+          fi
+
+          echo "Supabase database query successful."
+          cat /tmp/supabase-response.json
